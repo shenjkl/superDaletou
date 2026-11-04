@@ -40,6 +40,12 @@ try {
         }
     }
 
+    $venvVersion = & $venvPython -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
+    if ($null -eq $venvVersion) { $venvVersion = '不可用' } else { $venvVersion = $venvVersion.Trim() }
+    if ($LASTEXITCODE -ne 0 -or $venvVersion -ne '3.12') {
+        throw "现有 .venv 不是 Python 3.12（检测到 $venvVersion）。请先自行备份并移走或删除 .venv，再重新运行本脚本。"
+    }
+
     & $venvPython -m pip install -r $requirements
     if ($LASTEXITCODE -ne 0) {
         throw '安装项目依赖失败。请检查网络和 Python 包索引配置后重试。'
