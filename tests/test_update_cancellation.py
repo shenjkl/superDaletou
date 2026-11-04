@@ -125,7 +125,8 @@ class UpdateCancellationTests(unittest.TestCase):
     def test_http_handler_requires_origin_session_and_csrf(self):
         from dlt.app import Handler
         def call(csrf):
-            body = json.dumps({'plan_id': self.plan, 'run_id': self.claim['run_id']}).encode()
+            body = json.dumps({'plan_id': self.plan, 'run_id': self.claim['run_id'],
+                               'request_key': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}).encode()
             handler = object.__new__(Handler)
             handler.server = SimpleNamespace(origin='http://127.0.0.1:8766', csrf='secret', scheduler=self.scheduler)
             handler.path = '/api/update-runs/cancel'

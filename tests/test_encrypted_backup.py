@@ -16,6 +16,7 @@ from dlt.encrypted_backup import (BackupError, HEADER, _crypto, _key,
 from dlt.integrity import check_database
 from dlt.app import Handler
 from dlt.recovery_guard import RecoveryQuarantined, require_path_execution_allowed
+from dlt.recovery import protect_private_directory
 from dlt.scheduler import Scheduler
 from dlt.snapshots import SnapshotStore
 from test_scheduler import configuration
@@ -36,6 +37,7 @@ class EncryptedBackupTests(unittest.TestCase):
     def setUpClass(cls):
         workspace = Path(__file__).resolve().parents[1]
         cls.root_directory = tempfile.TemporaryDirectory(dir=workspace)
+        protect_private_directory(cls.root_directory.name)
         cls.previous_tempdir = tempfile.tempdir
         tempfile.tempdir = cls.root_directory.name
 
@@ -46,9 +48,11 @@ class EncryptedBackupTests(unittest.TestCase):
 
     def setUp(self):
         fixtures.PaperResultsTests.setUp(self)
+        protect_private_directory(self.path.parent)
         workspace = Path(__file__).resolve().parents[1]
         self.directory = tempfile.TemporaryDirectory(dir=workspace)
         self.addCleanup(self.directory.cleanup)
+        protect_private_directory(self.directory.name)
         root = Path(self.directory.name).resolve()
         self.assertTrue(root.is_relative_to(workspace))
         self.encrypted, self.candidate = root / 'snapshot.dltbak', root / 'candidate.sqlite3'

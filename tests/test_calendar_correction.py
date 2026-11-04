@@ -14,6 +14,7 @@ from dlt.integrity import check_database
 from dlt.candidates import _canonical
 from dlt.pair_repository import PairRepository
 from dlt.prospective import RegistrationError
+from dlt.source_write_protocol import digest as source_write_digest
 import test_prospective_settlement as fixtures
 import test_rolling_training as rolling_fixtures
 import test_source_correction_http as http_fixtures
@@ -234,7 +235,10 @@ class CalendarCorrectionHttpTests(unittest.TestCase):
         replacement = {**self.calendar, 'version': 'calendar-http-v2',
                        'cutoff_at': (self.deadline+timedelta(minutes=30)).isoformat()}
         new_id = self.review('calendar', replacement)
-        body = {'old_review_id': self.cal_id, 'new_review_id': new_id, 'note': 'synthetic', 'confirmed': True}
+        body = {'old_review_id': self.cal_id, 'new_review_id': new_id, 'note': 'synthetic', 'confirmed': True,
+                'request_key': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}
+        body['request_sha256'] = source_write_digest({'old_review_id': self.cal_id, 'new_review_id': new_id,
+                                                       'issue': None, 'note': 'synthetic', 'confirmed': True})
         request, read, write = self.start_server()
         with patch('dlt.app.PaperResults', return_value=self.paper):
             self.assertEqual(request('POST', '/api/source-corrections', json.dumps(body), {**write, 'Origin': 'https://evil.invalid'})[0], 403)
@@ -259,14 +263,14 @@ class CalendarCorrectionSeriesTests(unittest.TestCase):
     def test_cross_period_summary_withdraws_old_calendar_result(self):
         self.start(); self.now = self.deadline+timedelta(hours=2)
         self.settle('period-1', '26017', self.calendar['draw_date'], 'pair-1')
-        self.assertEqual(self.series.describe('series')['valid'], 1)
+        self.assertEqual(self.series.describe(series_fixtures.fixtures.SERIES_KEY)['valid'], 1)
         new = self.review('calendar', {**self.calendar, 'version': 'series-calendar-v2',
                                        'cutoff_at': (self.deadline+timedelta(minutes=30)).isoformat()})
         correction = self.repo.declare_source_correction(self.cal_id, new, note='fixture', confirmed=True)
-        report = self.series.describe('series')
+        report = self.series.describe(series_fixtures.fixtures.SERIES_KEY)
         self.assertEqual((report['valid'], report['counts']['review_required']), (0, 1))
         self.paper.process_source_correction(correction['correction_id'])
-        self.assertEqual(self.series.describe('series')['valid'], 1)
+        self.assertEqual(self.series.describe(series_fixtures.fixtures.SERIES_KEY)['valid'], 1)
 
 
 if __name__ == '__main__':

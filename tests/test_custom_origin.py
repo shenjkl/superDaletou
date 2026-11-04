@@ -50,7 +50,10 @@ class CustomOriginTests(unittest.TestCase):
                 db.execute("DELETE FROM custom_origin_declarations")
         report = check_database(self.path)
         self.assertEqual(report['status'], 'passed', report)
+        from dlt.recovery import protect_private_directory
+        protect_private_directory(self.path.parent)
         with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1]) as directory:
+            protect_private_directory(directory)
             target = Path(directory) / 'candidate.sqlite3'
             self.assertEqual(prepare_isolated_copy(self.path, target)['status'], 'prepared')
             self.assertEqual(len(list_legacy_custom(target)[0]['declarations']), 1)

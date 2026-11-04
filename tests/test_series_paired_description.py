@@ -6,6 +6,7 @@ import sqlite3
 
 import test_scoped_correction as fixtures
 from dlt.candidates import _canonical
+from test_prospective_series import SERIES_KEY
 
 
 class SeriesPairedDescriptionTests(unittest.TestCase):
@@ -21,18 +22,18 @@ class SeriesPairedDescriptionTests(unittest.TestCase):
 
     def test_current_summary_withdraws_corrected_period_until_recomputed(self):
         self.complete_both()
-        report = self.series.describe('series')
+        report = self.series.describe(SERIES_KEY)
         summary = report['paired_description']
         self.assertEqual((summary['planned'], summary['included'], summary['missing']), (2, 2, 0))
         self.assertEqual(summary['mean_fraction'], report['mean_difference_fraction'])
         self.assertEqual(summary['positive']+summary['zero']+summary['negative'], 2)
         new = self.changed_rule()
         correction = self.repo.declare_scoped_source_correction(self.rule_id, new, issue='26017', note='fixture', confirmed=True)
-        partial = self.series.describe('series')['paired_description']
+        partial = self.series.describe(SERIES_KEY)['paired_description']
         self.assertEqual((partial['included'], partial['missing'], partial['completeness']), (1, 1, 'partial'))
         self.assertIsNone(partial['leave_one_out_min_fraction'])
         self.paper.process_source_correction(correction['correction_id'], scope='issue')
-        self.assertEqual(self.series.describe('series')['paired_description']['included'], 2)
+        self.assertEqual(self.series.describe(SERIES_KEY)['paired_description']['included'], 2)
 
     def test_inaccurate_legacy_period_is_excluded_until_new_result(self):
         first, _ = self.complete_both()
@@ -47,11 +48,11 @@ class SeriesPairedDescriptionTests(unittest.TestCase):
             db.execute('UPDATE paper_groups SET id=?,content_json=? WHERE id=?', (ident, encoded, first['group_id']))
             db.execute('UPDATE paper_current SET group_id=? WHERE experiment_key=?', (ident, 'period-1'))
             db.execute('UPDATE paper_publications SET group_id=? WHERE experiment_key=?', (ident, 'period-1'))
-        report = self.series.describe('series')
+        report = self.series.describe(SERIES_KEY)
         self.assertEqual((report['valid'], report['counts']['review_required']), (1, 1))
         self.assertEqual(report['paired_description']['included'], 1)
         self.assertEqual(self.paper.process_one('period-1', legacy['source_snapshot_id'])['status'], 'complete')
-        self.assertEqual(self.series.describe('series')['paired_description']['included'], 2)
+        self.assertEqual(self.series.describe(SERIES_KEY)['paired_description']['included'], 2)
         self.assertEqual(self.paper.get_group(ident), legacy)
 
 

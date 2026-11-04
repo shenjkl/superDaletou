@@ -4,6 +4,7 @@ import threading
 import time
 import unittest
 from datetime import timedelta
+from unittest.mock import patch
 
 from dlt.app import LocalServer
 import test_rolling_policy as fixtures
@@ -19,7 +20,9 @@ class RollingTrainingHttpTests(unittest.TestCase):
 
     def setUp(self):
         self.setUpBase()
-        self.series.create('rolling', self.manifest)
+        self.series.create(fixtures.ROLLING_SERIES_KEY, self.manifest)
+        self.acl_patch = patch('dlt.recovery._require_private_acl')
+        self.acl_patch.start(); self.addCleanup(self.acl_patch.stop)
         self.server = LocalServer(0, self.path)
         self.server.experiments = self.repo
         self.server.jobs.recover_interrupted()
@@ -48,9 +51,10 @@ class RollingTrainingHttpTests(unittest.TestCase):
             conn.close()
 
     def test_local_plan_runs_without_browser_polling_and_rejects_cross_site(self):
-        body = {'series_key': 'rolling', 'issue': '26017', 'calendar_review_id': self.cal_id,
+        body = {'series_key': fixtures.ROLLING_SERIES_KEY, 'issue': '26017', 'calendar_review_id': self.cal_id,
                 'expected_cutoff_issue': '26016', 'start_at': (self.now-timedelta(minutes=1)).isoformat(),
-                'timeout': 20, 'confirmed': True}
+                'timeout': 20, 'confirmed': True,
+                'request_key': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}
         self.assertEqual(self.request('GET', '/api/rolling-training-plans')[0], 401)
         self.assertEqual(self.request('POST', '/api/rolling-training-plans', body,
                                       {**self.write, 'Origin': 'https://attacker.invalid'})[0], 403)
@@ -73,14 +77,15 @@ class RollingTrainingHttpTests(unittest.TestCase):
         self.assertEqual(self.server.jobs.get(plan['job_key'])['request']['config']['rolling_issue'], '26017')
 
     def test_registration_plan_runs_without_browser_and_rejects_cross_site(self):
-        training = {'series_key': 'rolling', 'issue': '26017', 'calendar_review_id': self.cal_id,
+        training = {'series_key': fixtures.ROLLING_SERIES_KEY, 'issue': '26017', 'calendar_review_id': self.cal_id,
                     'expected_cutoff_issue': '26016', 'start_at': (self.now-timedelta(minutes=1)).isoformat(),
-                    'timeout': 20, 'confirmed': True}
+                    'timeout': 20, 'confirmed': True,
+                    'request_key': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'}
         status, _, response = self.request('POST', '/api/rolling-training-plans', training, self.write)
         self.assertEqual(status, 200, response)
         body = {'training_plan_id': response['plan']['id'], 'rule_review_id': self.rule_id,
                 'tax_review_id': self.tax_id, 'internal_deadline': (self.deadline-timedelta(hours=1)).isoformat(),
-                'confirmed': True}
+                'confirmed': True, 'request_key': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'}
         self.assertEqual(self.request('GET', '/api/rolling-registration-plans')[0], 401)
         self.assertEqual(self.request('POST', '/api/rolling-registration-plans', body,
                                       {**self.write, 'Origin': 'https://attacker.invalid'})[0], 403)

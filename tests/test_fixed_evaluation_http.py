@@ -3,8 +3,9 @@ import json
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
-from dlt.app import LocalServer
+from dlt.app import LocalServer, _fixed_evaluation_write_digest
 import test_fixed_evaluation as fixtures
 
 
@@ -13,6 +14,8 @@ class FixedEvaluationHttpTests(unittest.TestCase):
 
     def setUp(self):
         self.setUpBase()
+        self.acl_patch = patch('dlt.recovery._require_private_acl')
+        self.acl_patch.start(); self.addCleanup(self.acl_patch.stop)
         self.server = LocalServer(0, self.path)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True); self.thread.start()
         self.addCleanup(self.close_server)
@@ -36,14 +39,21 @@ class FixedEvaluationHttpTests(unittest.TestCase):
 
     def test_confirmed_multimethod_protocol_and_result_are_session_protected(self):
         body = {'reservation_id': self.reservation, 'methods': self.methods, 'hypothesis': '预先固定比较',
-                'timeout': 30, 'confirmed': True}
+                'timeout': 30, 'confirmed': True,
+                'request_key': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}
+        body['request_sha256'] = _fixed_evaluation_write_digest('freeze', {
+            key: body[key] for key in ('reservation_id', 'methods', 'hypothesis', 'timeout', 'confirmed')})
         self.assertEqual(self.request('GET', '/api/fixed-evaluations')[0], 401)
         self.assertEqual(self.request('POST', '/api/fixed-evaluations', body, {**self.write, 'Origin': 'https://evil.invalid'})[0], 403)
         self.assertEqual(self.request('POST', '/api/fixed-evaluations', {**body, 'confirmed': False}, self.write)[0], 400)
         status, _, result = self.request('POST', '/api/fixed-evaluations', body, self.write)
         self.assertEqual(status, 200, result)
         self.assertEqual(result['evaluation']['status'], 'pending')
-        status, _, result = self.request('POST', '/api/fixed-evaluations/start', {'reservation_id': self.reservation, 'request_key': 'first-run'}, self.write)
+        start_body = {'reservation_id': self.reservation, 'request_key': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                      'retry': False}
+        start_body['request_sha256'] = _fixed_evaluation_write_digest('start', {
+            'reservation_id': self.reservation, 'retry': False})
+        status, _, result = self.request('POST', '/api/fixed-evaluations/start', start_body, self.write)
         self.assertEqual(status, 200, result)
         until = time.monotonic()+30
         while time.monotonic() < until:
@@ -57,7 +67,10 @@ class FixedEvaluationHttpTests(unittest.TestCase):
         self.assertEqual([x['id'] for x in result['evaluations'][0]['report']['methods']], ['hot', 'cold'])
 
     def test_start_before_freeze_does_not_create_partial_schema(self):
-        body = {'reservation_id': self.reservation, 'request_key': 'missing'}
+        body = {'reservation_id': self.reservation, 'request_key': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+                'retry': False}
+        body['request_sha256'] = _fixed_evaluation_write_digest('start', {
+            'reservation_id': self.reservation, 'retry': False})
         self.assertEqual(self.request('POST', '/api/fixed-evaluations/start', body, self.write)[0], 400)
         status, _, result = self.request('GET', '/api/integrity', headers=self.read)
         self.assertEqual(status, 200)

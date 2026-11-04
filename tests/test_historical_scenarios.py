@@ -32,8 +32,8 @@ class HistoricalScenarioTests(unittest.TestCase):
         self.assertIn('未经独立核验', standard['26123']['assumptions'])
 
     def test_unsupported_and_conflicting_issues_remain_blocked(self):
-        result = backtest_scenarios(self.path, self.snapshot, ['26050', '26124'])
-        self.assertIn('派奖', result['26050']['blocked_reason'])
+        result = backtest_scenarios(self.path, self.snapshot, ['26121', '26124'], additional=True)
+        self.assertIn('奖金缺失', result['26121']['blocked_reason'])
         self.assertIn('范围', result['26124']['blocked_reason'])
         changed = deepcopy(self.source)
         changed['value']['list'][0]['prizeLevelList'][0]['stakeAmount'] = '1'

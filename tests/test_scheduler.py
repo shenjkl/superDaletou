@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from dlt.official import SourceError, fetch_latest, fetch_latest_bounded
+from dlt.recovery import protect_private_directory
 from dlt.scheduler import ScheduleError, Scheduler
 from test_backtest import source_data
 
@@ -63,6 +64,7 @@ class SchedulerTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
+        protect_private_directory(self.tmp.name)
         self.path = Path(self.tmp.name)/'data.sqlite3'
         self.current = datetime(2026, 1, 1, tzinfo=timezone.utc)
         self.scheduler = Scheduler(self.path, clock=lambda: self.current)

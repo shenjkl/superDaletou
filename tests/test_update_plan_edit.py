@@ -113,13 +113,17 @@ class UpdatePlanEditTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT count(*) FROM update_plan_changes').fetchone()[0], 0)
 
     def test_edited_plan_and_run_config_survive_isolated_copy_without_execution(self):
-        from dlt.recovery import prepare_isolated_copy
+        from dlt.recovery import prepare_isolated_copy, protect_private_directory
         self.edit(self.changed(interval_seconds=120))
         self.scheduler.set_enabled(self.plan, True)
         claim = self.scheduler.claim(self.plan)
+        self.scheduler._record_attempt(claim, 1, 'failed', 'fixture')
         self.scheduler._finish(claim, 'failed', error='fixture')
+        protect_private_directory(self.path.parent)
         workspace = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory(dir=workspace) as directory:
+            from dlt.recovery import protect_private_directory
+            protect_private_directory(directory)
             target = Path(directory) / 'candidate.sqlite3'
             before = hashlib.sha256(self.path.read_bytes()).hexdigest()
             self.assertEqual(prepare_isolated_copy(self.path, target)['status'], 'prepared')
@@ -172,7 +176,8 @@ class UpdatePlanEditTests(unittest.TestCase):
         from dlt.app import Handler
         def call(csrf):
             body = json.dumps({'plan_id': self.plan, 'config': self.changed(interval_seconds=120),
-                               'expected_sha256': self.current()['config_sha256']}).encode()
+                               'expected_sha256': self.current()['config_sha256'],
+                               'request_key': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}).encode()
             handler = object.__new__(Handler)
             handler.server = SimpleNamespace(origin='http://127.0.0.1:8766', csrf='secret', scheduler=self.scheduler)
             handler.path = '/api/update-plans/edit'

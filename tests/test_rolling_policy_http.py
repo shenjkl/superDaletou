@@ -29,7 +29,7 @@ class RollingPolicyHttpTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(listing['series'], [])
         status, _, response = request('POST', '/api/experiment-series',
-            json.dumps({'series_key': 'rolling-http', 'manifest': self.manifest}), write)
+            json.dumps({'series_key': fixtures.ROLLING_SERIES_KEY, 'manifest': self.manifest}), write)
         self.assertEqual(status, 200, response)
         self.assertEqual(response['series']['rolling_spec'], spec)
         self.assertEqual(response['series']['manifest']['retraining_policy'], 'rolling_retrain_v1')

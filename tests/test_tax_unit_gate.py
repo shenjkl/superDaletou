@@ -38,7 +38,8 @@ class TaxUnitGateTests(unittest.TestCase):
     def test_existing_result_waits_for_review_and_recalculation(self):
         # Reproduce records written by the previous implementation without
         # silently changing their immutable rule or settlement history.
-        with patch('dlt.settlement.require_tax_unit'):
+        with patch('dlt.prospective.validate_dlt_2026_rule_mapping'), \
+             patch('dlt.prospective.settle_portfolio', return_value={'cost': '4.00'}):
             self.repo.freeze('legacy', self.legacy_protocol)
         before_draw = self.paper.inspect_current('legacy')
         self.assertEqual(before_draw['status'], 'review_required')
@@ -49,11 +50,16 @@ class TaxUnitGateTests(unittest.TestCase):
                 'lotteryDrawResult': ' '.join(map(str, ticket['front']+ticket['back'])),
                 'lotteryPromotionFlag': 0, 'verify': 1,
                 'prizeLevelList': [{'sort': 101, 'stakeAmount': '6000'}, {'sort': 201, 'stakeAmount': '100'},
-                                   {'sort': 301, 'stakeAmount': '5000'}, {'sort': 401, 'stakeAmount': '200'}]}
+                                   {'sort': 301, 'stakeAmount': '5000'}, {'sort': 401, 'stakeAmount': '200'},
+                                   {'sort': 501, 'stakeAmount': '1000'}, {'sort': 601, 'stakeAmount': '500'},
+                                   {'sort': 701, 'stakeAmount': '300'}, {'sort': 801, 'stakeAmount': '200'},
+                                   {'sort': 901, 'stakeAmount': '100'}]}
         snapshot = self.import_draw(draw)
-        with patch('dlt.settlement.require_tax_unit'):
+        with patch('dlt.prospective_settlement.validate_dlt_2026_rule_mapping'), \
+             patch('dlt.prospective_settlement.require_tax_unit'), \
+             patch('dlt.settlement.require_tax_unit'):
             original = self.paper.process_one('legacy', snapshot)
-        self.assertEqual(original['status'], 'complete')
+        self.assertEqual(original['status'], 'complete', original)
         current = self.paper.inspect_current('legacy')
         self.assertEqual(current['status'], 'review_required')
         self.assertIn('tax unit', current['reason'])

@@ -12,6 +12,8 @@ from unittest.mock import patch
 
 from dlt import autostart
 from dlt.recovery_guard import RecoveryQuarantined
+from dlt.recovery import protect_private_directory
+from dlt.scheduler import Scheduler
 
 
 class Key:
@@ -41,7 +43,10 @@ class Registry:
 class AutostartTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        protect_private_directory(self.tmp.name)
         self.db = Path(self.tmp.name) / '研究 数据.sqlite3'
+        self.scheduler = Scheduler(self.db)
+        self.scheduler.initialize()
         self.registry = Registry()
         self.reg_patch = patch('dlt.autostart._registry', return_value=self.registry)
         self.reg_patch.start(); self.addCleanup(self.reg_patch.stop)
@@ -123,9 +128,12 @@ class AutostartTests(unittest.TestCase):
     def test_route_checks_session_origin_and_csrf_before_setting(self):
         from dlt.app import Handler
         def call(enabled=True, *, origin='http://127.0.0.1:8766', csrf='secret', session=True):
-            body = json.dumps({'enabled': enabled}).encode()
+            body = json.dumps({'enabled': enabled, 'port': 8766,
+                               'request_key': ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' if enabled
+                                               else 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')}).encode()
             handler = object.__new__(Handler)
-            handler.server = SimpleNamespace(origin='http://127.0.0.1:8766', csrf='secret', db_path=self.db)
+            handler.server = SimpleNamespace(origin='http://127.0.0.1:8766', csrf='secret', db_path=self.db,
+                                             scheduler=self.scheduler)
             handler.path = '/api/autostart'
             handler.headers = {'Origin': origin, 'Sec-Fetch-Site': 'same-origin', 'X-DLT-CSRF': csrf,
                                'Content-Type': 'application/json', 'Content-Length': str(len(body))}
