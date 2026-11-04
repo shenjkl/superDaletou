@@ -1,0 +1,4 @@
+numpy==2.3.5
+pypdfium2==5.14.0
+Pillow==12.3.0
+cryptography==50.0.2

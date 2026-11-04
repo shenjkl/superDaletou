@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "id": "dlt-research",
+      "title": "大乐透投注结构与历史回测",
+      "queries": [
+        {
+          "id": "official-payouts",
+          "source": {
+            "label": "中国体彩官方开奖接口",
+            "links": [
+              "https://www.sporttery.cn/",
+              "https://www.shsportslottery.com/dlt/kjgg.html"
+            ],
+            "metricDefinitions": [
+              {
+                "name": "中奖概率",
+                "definition": "中奖概率表示合并投注中至少有一注获得奖金的概率。"
+              },
+              {
+                "name": "整期盈利概率",
+                "definition": "整期盈利概率表示同一期合并税后奖金超过36元的概率。"
+              }
+            ],
+            "filters": [
+              "历史：2026年第26001—26123期",
+              "收益比较排除26050—26066派奖期",
+              "结构概率图采用第26123期公布奖金",
+              "每种方案成本36元"
+            ],
+            "caveats": [
+              "奖金情景固定为各期公布金额，不重算假设新增中奖注对浮动奖分配的影响。",
+              "分散单式图为一组固定组合的50万次模拟，不能代表所有号码排列。",
+              "500次历史纸面试验共享106期实际开奖，不是500段独立历史；本次回测属于探索性分析。",
+              "追加无人中奖而未公布单注追加奖金时，按基本奖金的80%向下取整估算，可能有1元舍入差异。"
+            ],
+            "evidenceFlow": [
+              {
+                "kind": "validation",
+                "title": "数据核验",
+                "body": "官方200期无重复、无非法号码；2026年123期期号完整。与GitHub号码和日期200期一致，26098期销售额不一致。"
+              },
+              {
+                "kind": "validation",
+                "title": "独立复核",
+                "body": "93个新规则常规奖期固定奖与官方奖池档位一致；424次组合期望线性检查、税费边界及概率质量守恒检查通过。"
+              }
+            ]
+          },
+          "reportingPeriod": "2026-01-03—2026-10-28；结构图为26123期奖金情景",
+          "columns": [
+            "strategy",
+            "any_prize_pct",
+            "profit_pct",
+            "method"
+          ],
+          "rows": [
+            {
+              "strategy": "18注分散单式",
+              "any_prize_pct": 71.5052,
+              "profit_pct": 1.4004,
+              "method": "50万次模拟"
+            },
+            {
+              "strategy": "前6后3复式",
+              "any_prize_pct": 13.969706,
+              "profit_pct": 10.311564,
+              "method": "精确计数"
+            },
+            {
+              "strategy": "4胆6拖后3",
+              "any_prize_pct": 20.197037,
+              "profit_pct": 5.440314,
+              "method": "精确计数"
+            },
+            {
+              "strategy": "同一注18倍",
+              "any_prize_pct": 6.670476,
+              "profit_pct": 6.670476,
+              "method": "精确计数"
+            },
+            {
+              "strategy": "12注追加单式",
+              "any_prize_pct": 59.2694,
+              "profit_pct": 0.8102,
+              "method": "50万次模拟"
+            }
+          ],
+          "preview": {
+            "kind": "aggregate",
+            "note": "结构比较汇总；模拟只报告概率，未用有限抽样均值估计稀有大奖期望。",
+            "totalRows": 5
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "experiment_id": "dlt-paper-v2",
+  "valid_settled_issues": 0,
+  "pending_issues": [
+    "26124"
+  ],
+  "excluded_promotional_issues": [],
+  "excluded_records": [],
+  "replicates": 500,
+  "strategies": 9,
+  "summaries": {},
+  "efficacy_conclusion": "not_evaluated; no significance or profit certification",
+  "ledger_last_hash": "8b62c7cace651e48d0d6a144bfd847c0bb16d0b2e0a7edc552efcfe2d56787e0"
+}

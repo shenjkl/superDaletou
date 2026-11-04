@@ -1,0 +1,3 @@
+const {chromium}=require('C:/Users/申群辉/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const fs=require('fs');
+(async()=>{const b=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});try{const p=await b.newPage();const r=await p.goto('http://127.0.0.1:8766/');await p.getByRole('heading',{name:'研究概览',exact:true}).waitFor();const result={url:p.url(),http_status:r.status(),title:await p.title(),navigation_items:await p.locator('.nav-item').count()};fs.writeFileSync(__dirname+'/qa/preview_health.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));}finally{await b.close();}})().catch(e=>{console.error(e);process.exit(1);});

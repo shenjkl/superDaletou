@@ -1,0 +1,1532 @@
+{
+  "quality": {
+    "official_rows": 200,
+    "duplicates": 0,
+    "invalid_numbers": [],
+    "first": "25074",
+    "last": "26123",
+    "year2026_rows": 123,
+    "missing_2026_issues": [],
+    "github_comparison_rows": 200,
+    "github_mismatches": {
+      "numbers": [],
+      "date": [],
+      "sales": [
+        "26098"
+      ],
+      "pool": []
+    },
+    "promotional_issues": [
+      "26050",
+      "26051",
+      "26052",
+      "26053",
+      "26054",
+      "26055",
+      "26056",
+      "26057",
+      "26058",
+      "26059",
+      "26060",
+      "26061",
+      "26062",
+      "26063",
+      "26064",
+      "26065",
+      "26066"
+    ],
+    "high_pool_regular_new_issues": [
+      "26015",
+      "26016",
+      "26021",
+      "26029",
+      "26030",
+      "26031",
+      "26042",
+      "26044",
+      "26047",
+      "26067",
+      "26069",
+      "26071",
+      "26072",
+      "26073",
+      "26075",
+      "26076",
+      "26077",
+      "26079",
+      "26083",
+      "26086",
+      "26087",
+      "26090",
+      "26091",
+      "26092",
+      "26093",
+      "26096",
+      "26107",
+      "26108",
+      "26109",
+      "26110",
+      "26111",
+      "26112",
+      "26120",
+      "26121",
+      "26122"
+    ]
+  },
+  "unit_expectations": [
+    {
+      "issue": "26001",
+      "basic_gross_per_yuan": 0.4487523915191243,
+      "additional_gross_per_yuan": 0.39294043841654674,
+      "basic_after_tax_per_yuan_single": 0.41358775381653595,
+      "additional_after_tax_per_yuan_single": 0.3507429111340617
+    },
+    {
+      "issue": "26002",
+      "basic_gross_per_yuan": 0.5502689245519589,
+      "additional_gross_per_yuan": 0.5147602718328956,
+      "basic_after_tax_per_yuan_single": 0.4948009802428036,
+      "additional_after_tax_per_yuan_single": 0.4481987778671408
+    },
+    {
+      "issue": "26003",
+      "basic_gross_per_yuan": 0.5362272908363559,
+      "additional_gross_per_yuan": 0.4979104389467508,
+      "basic_after_tax_per_yuan_single": 0.48356767327032113,
+      "additional_after_tax_per_yuan_single": 0.434718911558225
+    },
+    {
+      "issue": "26004",
+      "basic_gross_per_yuan": 0.4694614349338776,
+      "additional_gross_per_yuan": 0.41779128117967174,
+      "basic_after_tax_per_yuan_single": 0.43015498854833856,
+      "additional_after_tax_per_yuan_single": 0.3706235853445617
+    },
+    {
+      "issue": "26005",
+      "basic_gross_per_yuan": 0.5325667123687652,
+      "additional_gross_per_yuan": 0.49351774167411566,
+      "basic_after_tax_per_yuan_single": 0.48063921049624864,
+      "additional_after_tax_per_yuan_single": 0.4312047537401169
+    },
+    {
+      "issue": "26006",
+      "basic_gross_per_yuan": 0.4575701848321307,
+      "additional_gross_per_yuan": 0.4035219770837332,
+      "basic_after_tax_per_yuan_single": 0.420641988466941,
+      "additional_after_tax_per_yuan_single": 0.3592081420678109
+    },
+    {
+      "issue": "26007",
+      "basic_gross_per_yuan": 0.422827372084531,
+      "additional_gross_per_yuan": 0.3618304804370873,
+      "basic_after_tax_per_yuan_single": 0.39284773826886127,
+      "additional_after_tax_per_yuan_single": 0.3258549447504942
+    },
+    {
+      "issue": "26008",
+      "basic_gross_per_yuan": 0.48980166913472933,
+      "additional_gross_per_yuan": 0.44219950932474655,
+      "basic_after_tax_per_yuan_single": 0.4464271759090199,
+      "additional_after_tax_per_yuan_single": 0.39015016786062157
+    },
+    {
+      "issue": "26009",
+      "basic_gross_per_yuan": 0.48222299450305317,
+      "additional_gross_per_yuan": 0.4331050935436825,
+      "basic_after_tax_per_yuan_single": 0.44036423620367904,
+      "additional_after_tax_per_yuan_single": 0.3828746352357703
+    },
+    {
+      "issue": "26010",
+      "basic_gross_per_yuan": 0.4928026662544517,
+      "additional_gross_per_yuan": 0.44580069653383436,
+      "basic_after_tax_per_yuan_single": 0.4488279736047978,
+      "additional_after_tax_per_yuan_single": 0.39303111762789184
+    },
+    {
+      "issue": "26011",
+      "basic_gross_per_yuan": 0.6177378142672691,
+      "additional_gross_per_yuan": 0.5957229488258469,
+      "basic_after_tax_per_yuan_single": 0.5487760920150518,
+      "additional_after_tax_per_yuan_single": 0.5129689194615018
+    },
+    {
+      "issue": "26012",
+      "basic_gross_per_yuan": 0.4837432940384898,
+      "additional_gross_per_yuan": 0.4349296459008379,
+      "basic_after_tax_per_yuan_single": 0.44158047583202836,
+      "additional_after_tax_per_yuan_single": 0.38433427712149465
+    },
+    {
+      "issue": "26013",
+      "basic_gross_per_yuan": 0.42861966500809867,
+      "additional_gross_per_yuan": 0.3687813501833685,
+      "basic_after_tax_per_yuan_single": 0.3974815726077154,
+      "additional_after_tax_per_yuan_single": 0.33141564054751915
+    },
+    {
+      "issue": "26014",
+      "basic_gross_per_yuan": 0.6238668987989757,
+      "additional_gross_per_yuan": 0.6006509842006651,
+      "basic_after_tax_per_yuan_single": 0.5545894810870229,
+      "additional_after_tax_per_yuan_single": 0.5175180953924269
+    },
+    {
+      "issue": "26015",
+      "basic_gross_per_yuan": 0.6724293923114434,
+      "additional_gross_per_yuan": 0.6081803800343563,
+      "basic_after_tax_per_yuan_single": 0.6124690978764207,
+      "additional_after_tax_per_yuan_single": 0.5362280267123288
+    },
+    {
+      "issue": "26016",
+      "basic_gross_per_yuan": 0.5343965698782845,
+      "additional_gross_per_yuan": 0.44254087487656574,
+      "basic_after_tax_per_yuan_single": 0.5020428399298936,
+      "additional_after_tax_per_yuan_single": 0.4037164225860965
+    },
+    {
+      "issue": "26017",
+      "basic_gross_per_yuan": 0.507895863624042,
+      "additional_gross_per_yuan": 0.46148586956332344,
+      "basic_after_tax_per_yuan_single": 0.46181265294707596,
+      "additional_after_tax_per_yuan_single": 0.4061860036825536
+    },
+    {
+      "issue": "26018",
+      "basic_gross_per_yuan": 0.5311003900360464,
+      "additional_gross_per_yuan": 0.48933122969262355,
+      "basic_after_tax_per_yuan_single": 0.48037627407667943,
+      "additional_after_tax_per_yuan_single": 0.4284622917859937
+    },
+    {
+      "issue": "26019",
+      "basic_gross_per_yuan": 0.5816680677869654,
+      "additional_gross_per_yuan": 0.5500123869862528,
+      "basic_after_tax_per_yuan_single": 0.5208304162774148,
+      "additional_after_tax_per_yuan_single": 0.4770072176208971
+    },
+    {
+      "issue": "26020",
+      "basic_gross_per_yuan": 0.6132184778736874,
+      "additional_gross_per_yuan": 0.5878728790903192,
+      "basic_after_tax_per_yuan_single": 0.5460707443467923,
+      "additional_after_tax_per_yuan_single": 0.5072956113041502
+    },
+    {
+      "issue": "26021",
+      "basic_gross_per_yuan": 0.557735350871887,
+      "additional_gross_per_yuan": 0.4705475365299412,
+      "basic_after_tax_per_yuan_single": 0.5207138647247755,
+      "additional_after_tax_per_yuan_single": 0.426121751908797
+    },
+    {
+      "issue": "26022",
+      "basic_gross_per_yuan": 0.42448934719182263,
+      "additional_gross_per_yuan": 0.3613978538185025,
+      "basic_after_tax_per_yuan_single": 0.3950874398013004,
+      "additional_after_tax_per_yuan_single": 0.3261155910866968
+    },
+    {
+      "issue": "26023",
+      "basic_gross_per_yuan": 0.5096260511669344,
+      "additional_gross_per_yuan": 0.46356203549579433,
+      "basic_after_tax_per_yuan_single": 0.4631968029813899,
+      "additional_after_tax_per_yuan_single": 0.40784693642853037
+    },
+    {
+      "issue": "26024",
+      "basic_gross_per_yuan": 0.5491094998383251,
+      "additional_gross_per_yuan": 0.510942102336358,
+      "basic_after_tax_per_yuan_single": 0.49478356191850237,
+      "additional_after_tax_per_yuan_single": 0.4457509899009813
+    },
+    {
+      "issue": "26025",
+      "basic_gross_per_yuan": 0.44380429457840187,
+      "additional_gross_per_yuan": 0.38457592447802896,
+      "basic_after_tax_per_yuan_single": 0.41053939771056386,
+      "additional_after_tax_per_yuan_single": 0.3446580476143182
+    },
+    {
+      "issue": "26026",
+      "basic_gross_per_yuan": 0.5702381792493056,
+      "additional_gross_per_yuan": 0.5362965145180084,
+      "basic_after_tax_per_yuan_single": 0.5116865054472869,
+      "additional_after_tax_per_yuan_single": 0.46603451964630166
+    },
+    {
+      "issue": "26027",
+      "basic_gross_per_yuan": 0.4806461974285849,
+      "additional_gross_per_yuan": 0.4287862639057223,
+      "basic_after_tax_per_yuan_single": 0.4400129199907102,
+      "additional_after_tax_per_yuan_single": 0.3800263191564726
+    },
+    {
+      "issue": "26028",
+      "basic_gross_per_yuan": 0.6417001451340334,
+      "additional_gross_per_yuan": 0.6220508175722079,
+      "basic_after_tax_per_yuan_single": 0.568856078155069,
+      "additional_after_tax_per_yuan_single": 0.5346379620896612
+    },
+    {
+      "issue": "26029",
+      "basic_gross_per_yuan": 0.6105024421125421,
+      "additional_gross_per_yuan": 0.533867843769517,
+      "basic_after_tax_per_yuan_single": 0.5629275377172998,
+      "additional_after_tax_per_yuan_single": 0.47677799770045765
+    },
+    {
+      "issue": "26030",
+      "basic_gross_per_yuan": 0.6341221705957776,
+      "additional_gross_per_yuan": 0.5622117170870836,
+      "basic_after_tax_per_yuan_single": 0.5818233205038881,
+      "additional_after_tax_per_yuan_single": 0.4994530963545109
+    },
+    {
+      "issue": "26031",
+      "basic_gross_per_yuan": 0.6827707055896205,
+      "additional_gross_per_yuan": 0.6205901426597477,
+      "basic_after_tax_per_yuan_single": 0.6207421484989624,
+      "additional_after_tax_per_yuan_single": 0.5461558368126421
+    },
+    {
+      "issue": "26032",
+      "basic_gross_per_yuan": 0.5224855538056331,
+      "additional_gross_per_yuan": 0.47899318351707515,
+      "basic_after_tax_per_yuan_single": 0.47348440509234885,
+      "additional_after_tax_per_yuan_single": 0.42019185484555505
+    },
+    {
+      "issue": "26033",
+      "basic_gross_per_yuan": 0.42243401292801847,
+      "additional_gross_per_yuan": 0.35893164250504256,
+      "basic_after_tax_per_yuan_single": 0.39344317239025706,
+      "additional_after_tax_per_yuan_single": 0.32414262203592886
+    },
+    {
+      "issue": "26034",
+      "basic_gross_per_yuan": 0.4634909215619066,
+      "additional_gross_per_yuan": 0.4081998768582346,
+      "basic_after_tax_per_yuan_single": 0.42628869929736757,
+      "additional_after_tax_per_yuan_single": 0.36355720951848264
+    },
+    {
+      "issue": "26035",
+      "basic_gross_per_yuan": 0.5184286291162693,
+      "additional_gross_per_yuan": 0.47412499835089106,
+      "basic_after_tax_per_yuan_single": 0.47023886534085774,
+      "additional_after_tax_per_yuan_single": 0.41629730671260773
+    },
+    {
+      "issue": "26036",
+      "basic_gross_per_yuan": 0.47398063130877516,
+      "additional_gross_per_yuan": 0.42078758767347696,
+      "basic_after_tax_per_yuan_single": 0.43468046709486247,
+      "additional_after_tax_per_yuan_single": 0.3736273781706764
+    },
+    {
+      "issue": "26037",
+      "basic_gross_per_yuan": 0.5294821474310866,
+      "additional_gross_per_yuan": 0.48738915498661917,
+      "basic_after_tax_per_yuan_single": 0.47908167999271156,
+      "additional_after_tax_per_yuan_single": 0.4269086320211903
+    },
+    {
+      "issue": "26038",
+      "basic_gross_per_yuan": 0.5539177647865331,
+      "additional_gross_per_yuan": 0.516712272307839,
+      "basic_after_tax_per_yuan_single": 0.4986301738770688,
+      "additional_after_tax_per_yuan_single": 0.4503671258781661
+    },
+    {
+      "issue": "26039",
+      "basic_gross_per_yuan": 0.43458054042731464,
+      "additional_gross_per_yuan": 0.3735073541546717,
+      "basic_after_tax_per_yuan_single": 0.40316039438969403,
+      "additional_after_tax_per_yuan_single": 0.33580319135563225
+    },
+    {
+      "issue": "26040",
+      "basic_gross_per_yuan": 0.5109605692450268,
+      "additional_gross_per_yuan": 0.4651636314349787,
+      "basic_after_tax_per_yuan_single": 0.46426441744386365,
+      "additional_after_tax_per_yuan_single": 0.40912821317987785
+    },
+    {
+      "issue": "26041",
+      "basic_gross_per_yuan": 0.5758330224918546,
+      "additional_gross_per_yuan": 0.5430102704015934,
+      "basic_after_tax_per_yuan_single": 0.5161623800413261,
+      "additional_after_tax_per_yuan_single": 0.4714055243531697
+    },
+    {
+      "issue": "26042",
+      "basic_gross_per_yuan": 0.5771744714948096,
+      "additional_gross_per_yuan": 0.49387447816592206,
+      "basic_after_tax_per_yuan_single": 0.5362651612231136,
+      "additional_after_tax_per_yuan_single": 0.4447833052175816
+    },
+    {
+      "issue": "26043",
+      "basic_gross_per_yuan": 0.5899011664116459,
+      "additional_gross_per_yuan": 0.5598921675663956,
+      "basic_after_tax_per_yuan_single": 0.5274168951771591,
+      "additional_after_tax_per_yuan_single": 0.48491104208501135
+    },
+    {
+      "issue": "26044",
+      "basic_gross_per_yuan": 0.5474415739369595,
+      "additional_gross_per_yuan": 0.45819487041239676,
+      "basic_after_tax_per_yuan_single": 0.5124788431768335,
+      "additional_after_tax_per_yuan_single": 0.4162396190147613
+    },
+    {
+      "issue": "26045",
+      "basic_gross_per_yuan": 0.5178115667754705,
+      "additional_gross_per_yuan": 0.4733845795494062,
+      "basic_after_tax_per_yuan_single": 0.46974521546821874,
+      "additional_after_tax_per_yuan_single": 0.41570497167141984
+    },
+    {
+      "issue": "26046",
+      "basic_gross_per_yuan": 0.533410815005821,
+      "additional_gross_per_yuan": 0.49210373965635307,
+      "basic_after_tax_per_yuan_single": 0.4822246140524991,
+      "additional_after_tax_per_yuan_single": 0.4306802997569774
+    },
+    {
+      "issue": "26047",
+      "basic_gross_per_yuan": 0.6105922174254933,
+      "additional_gross_per_yuan": 0.5339757670596897,
+      "basic_after_tax_per_yuan_single": 0.5629993579676605,
+      "additional_after_tax_per_yuan_single": 0.4768643363325958
+    },
+    {
+      "issue": "26048",
+      "basic_gross_per_yuan": 0.5182017988480383,
+      "additional_gross_per_yuan": 0.4738529264900664,
+      "basic_after_tax_per_yuan_single": 0.470057401126273,
+      "additional_after_tax_per_yuan_single": 0.416079649223948
+    },
+    {
+      "issue": "26049",
+      "basic_gross_per_yuan": 0.5295381082318291,
+      "additional_gross_per_yuan": 0.48745669066524683,
+      "basic_after_tax_per_yuan_single": 0.47912644863330567,
+      "additional_after_tax_per_yuan_single": 0.4269626605640923
+    },
+    {
+      "issue": "26067",
+      "basic_gross_per_yuan": 0.5803136203828372,
+      "additional_gross_per_yuan": 0.49764132303592373,
+      "basic_after_tax_per_yuan_single": 0.5387764803335356,
+      "additional_after_tax_per_yuan_single": 0.44779678111358295
+    },
+    {
+      "issue": "26068",
+      "basic_gross_per_yuan": 0.47640937206660855,
+      "additional_gross_per_yuan": 0.42370188989129826,
+      "basic_after_tax_per_yuan_single": 0.4366234597011292,
+      "additional_after_tax_per_yuan_single": 0.3759588199449335
+    },
+    {
+      "issue": "26069",
+      "basic_gross_per_yuan": 0.6327216337081354,
+      "additional_gross_per_yuan": 0.5605310105913867,
+      "basic_after_tax_per_yuan_single": 0.5807028909937743,
+      "additional_after_tax_per_yuan_single": 0.49810853115795334
+    },
+    {
+      "issue": "26070",
+      "basic_gross_per_yuan": 0.5771884033538769,
+      "additional_gross_per_yuan": 0.5446366652054939,
+      "basic_after_tax_per_yuan_single": 0.5172466847309438,
+      "additional_after_tax_per_yuan_single": 0.47270664019629005
+    },
+    {
+      "issue": "26071",
+      "basic_gross_per_yuan": 0.6637286312818916,
+      "additional_gross_per_yuan": 0.5977394045683678,
+      "basic_after_tax_per_yuan_single": 0.6055084890527792,
+      "additional_after_tax_per_yuan_single": 0.5278752463395382
+    },
+    {
+      "issue": "26072",
+      "basic_gross_per_yuan": 0.7115184083497436,
+      "additional_gross_per_yuan": 0.6550871992803164,
+      "basic_after_tax_per_yuan_single": 0.6437403107070607,
+      "additional_after_tax_per_yuan_single": 0.5737534821090972
+    },
+    {
+      "issue": "26073",
+      "basic_gross_per_yuan": 0.6443270123298587,
+      "additional_gross_per_yuan": 0.5744577045249807,
+      "basic_after_tax_per_yuan_single": 0.5899871938911528,
+      "additional_after_tax_per_yuan_single": 0.5092498863048286
+    },
+    {
+      "issue": "26074",
+      "basic_gross_per_yuan": 0.5237587903729873,
+      "additional_gross_per_yuan": 0.48052112962842647,
+      "basic_after_tax_per_yuan_single": 0.4745029943462322,
+      "additional_after_tax_per_yuan_single": 0.42141421173463617
+    },
+    {
+      "issue": "26075",
+      "basic_gross_per_yuan": 0.6869525969545376,
+      "additional_gross_per_yuan": 0.6256081011450169,
+      "basic_after_tax_per_yuan_single": 0.624087661590896,
+      "additional_after_tax_per_yuan_single": 0.5501702036008574
+    },
+    {
+      "issue": "26076",
+      "basic_gross_per_yuan": 0.6795596104344164,
+      "additional_gross_per_yuan": 0.6167365173208713,
+      "basic_after_tax_per_yuan_single": 0.618173272374799,
+      "additional_after_tax_per_yuan_single": 0.543072936541541
+    },
+    {
+      "issue": "26077",
+      "basic_gross_per_yuan": 0.6283814512208509,
+      "additional_gross_per_yuan": 0.5553225955804876,
+      "basic_after_tax_per_yuan_single": 0.5772307450039467,
+      "additional_after_tax_per_yuan_single": 0.4939417991492341
+    },
+    {
+      "issue": "26078",
+      "basic_gross_per_yuan": 0.5019482666433676,
+      "additional_gross_per_yuan": 0.45434874385193513,
+      "basic_after_tax_per_yuan_single": 0.45705457536253635,
+      "additional_after_tax_per_yuan_single": 0.400476303113443
+    },
+    {
+      "issue": "26079",
+      "basic_gross_per_yuan": 0.5654506604027908,
+      "additional_gross_per_yuan": 0.4798058986324469,
+      "basic_after_tax_per_yuan_single": 0.5268861123494986,
+      "additional_after_tax_per_yuan_single": 0.43352844159080145
+    },
+    {
+      "issue": "26080",
+      "basic_gross_per_yuan": 0.45279932820902286,
+      "additional_gross_per_yuan": 0.39537007373819516,
+      "basic_after_tax_per_yuan_single": 0.41773542461506064,
+      "additional_after_tax_per_yuan_single": 0.353293367022451
+    },
+    {
+      "issue": "26081",
+      "basic_gross_per_yuan": 0.516301651959104,
+      "additional_gross_per_yuan": 0.47157261331618755,
+      "basic_after_tax_per_yuan_single": 0.46853728361512564,
+      "additional_after_tax_per_yuan_single": 0.41425539868484496
+    },
+    {
+      "issue": "26082",
+      "basic_gross_per_yuan": 0.5667129288398911,
+      "additional_gross_per_yuan": 0.5320662700341845,
+      "basic_after_tax_per_yuan_single": 0.5088663051197552,
+      "additional_after_tax_per_yuan_single": 0.4626503240592425
+    },
+    {
+      "issue": "26083",
+      "basic_gross_per_yuan": 0.5965679460267178,
+      "additional_gross_per_yuan": 0.517146579150633,
+      "basic_after_tax_per_yuan_single": 0.5517799408486401,
+      "additional_after_tax_per_yuan_single": 0.46340098600535035
+    },
+    {
+      "issue": "26084",
+      "basic_gross_per_yuan": 0.5036260638619617,
+      "additional_gross_per_yuan": 0.4563620413952482,
+      "basic_after_tax_per_yuan_single": 0.4583968131374117,
+      "additional_after_tax_per_yuan_single": 0.40208694114809346
+    },
+    {
+      "issue": "26085",
+      "basic_gross_per_yuan": 0.5806589998036005,
+      "additional_gross_per_yuan": 0.5488017543283198,
+      "basic_after_tax_per_yuan_single": 0.5200231618907227,
+      "additional_after_tax_per_yuan_single": 0.47603871149455074
+    },
+    {
+      "issue": "26086",
+      "basic_gross_per_yuan": 0.6663241109560326,
+      "additional_gross_per_yuan": 0.6008540424078633,
+      "basic_after_tax_per_yuan_single": 0.6075848727920921,
+      "additional_after_tax_per_yuan_single": 0.5303669566111346
+    },
+    {
+      "issue": "26087",
+      "basic_gross_per_yuan": 0.5639880252287532,
+      "additional_gross_per_yuan": 0.47805085777312795,
+      "basic_after_tax_per_yuan_single": 0.5257160042102684,
+      "additional_after_tax_per_yuan_single": 0.43212440890334625
+    },
+    {
+      "issue": "26088",
+      "basic_gross_per_yuan": 0.5377349420173294,
+      "additional_gross_per_yuan": 0.4972926920701632,
+      "basic_after_tax_per_yuan_single": 0.4856839156617059,
+      "additional_after_tax_per_yuan_single": 0.4348314616880254
+    },
+    {
+      "issue": "26089",
+      "basic_gross_per_yuan": 0.5343933494485504,
+      "additional_gross_per_yuan": 0.4932826658611547,
+      "basic_after_tax_per_yuan_single": 0.48301064160668267,
+      "additional_after_tax_per_yuan_single": 0.43162344072081865
+    },
+    {
+      "issue": "26090",
+      "basic_gross_per_yuan": 0.6787302330956376,
+      "additional_gross_per_yuan": 0.6157414512059156,
+      "basic_after_tax_per_yuan_single": 0.617509770503776,
+      "additional_after_tax_per_yuan_single": 0.5422768836495765
+    },
+    {
+      "issue": "26091",
+      "basic_gross_per_yuan": 0.7661658338355337,
+      "additional_gross_per_yuan": 0.720663985402212,
+      "basic_after_tax_per_yuan_single": 0.6874582510956929,
+      "additional_after_tax_per_yuan_single": 0.6262149110066136
+    },
+    {
+      "issue": "26092",
+      "basic_gross_per_yuan": 0.6872854913759692,
+      "additional_gross_per_yuan": 0.6260076366812609,
+      "basic_after_tax_per_yuan_single": 0.6243539771280413,
+      "additional_after_tax_per_yuan_single": 0.5504898320298527
+    },
+    {
+      "issue": "26093",
+      "basic_gross_per_yuan": 0.5319477364392838,
+      "additional_gross_per_yuan": 0.439602396099291,
+      "basic_after_tax_per_yuan_single": 0.500083773178693,
+      "additional_after_tax_per_yuan_single": 0.4013656395642768
+    },
+    {
+      "issue": "26094",
+      "basic_gross_per_yuan": 0.5546941917262773,
+      "additional_gross_per_yuan": 0.5176437388249532,
+      "basic_after_tax_per_yuan_single": 0.4992513154288642,
+      "additional_after_tax_per_yuan_single": 0.4511122990918575
+    },
+    {
+      "issue": "26095",
+      "basic_gross_per_yuan": 0.47158365145578357,
+      "additional_gross_per_yuan": 0.417911012712203,
+      "basic_after_tax_per_yuan_single": 0.4327628832124692,
+      "additional_after_tax_per_yuan_single": 0.37132611820165723
+    },
+    {
+      "issue": "26096",
+      "basic_gross_per_yuan": 0.5527809064174857,
+      "additional_gross_per_yuan": 0.4646023743186069,
+      "basic_after_tax_per_yuan_single": 0.5167503091612545,
+      "additional_after_tax_per_yuan_single": 0.42136562213972945
+    },
+    {
+      "issue": "26097",
+      "basic_gross_per_yuan": 0.47633541886496,
+      "additional_gross_per_yuan": 0.42361333585242505,
+      "basic_after_tax_per_yuan_single": 0.4365642971398104,
+      "additional_after_tax_per_yuan_single": 0.37588797671383495
+    },
+    {
+      "issue": "26098",
+      "basic_gross_per_yuan": 0.4172750478490516,
+      "additional_gross_per_yuan": 0.3527408875218087,
+      "basic_after_tax_per_yuan_single": 0.38931600032708363,
+      "additional_after_tax_per_yuan_single": 0.31919001804934183
+    },
+    {
+      "issue": "26099",
+      "basic_gross_per_yuan": 0.5385101087889168,
+      "additional_gross_per_yuan": 0.4982229606496469,
+      "basic_after_tax_per_yuan_single": 0.4863040490789758,
+      "additional_after_tax_per_yuan_single": 0.4355756765516124
+    },
+    {
+      "issue": "26100",
+      "basic_gross_per_yuan": 0.49520001949060083,
+      "additional_gross_per_yuan": 0.44625073214214145,
+      "basic_after_tax_per_yuan_single": 0.451655977640323,
+      "additional_after_tax_per_yuan_single": 0.3939978937456081
+    },
+    {
+      "issue": "26101",
+      "basic_gross_per_yuan": 0.45371295012273105,
+      "additional_gross_per_yuan": 0.3964664355922765,
+      "basic_after_tax_per_yuan_single": 0.4184663221460272,
+      "additional_after_tax_per_yuan_single": 0.35417045650571616
+    },
+    {
+      "issue": "26102",
+      "basic_gross_per_yuan": 0.5377269376158887,
+      "additional_gross_per_yuan": 0.49728296855043447,
+      "basic_after_tax_per_yuan_single": 0.4856775121405534,
+      "additional_after_tax_per_yuan_single": 0.4348236828722425
+    },
+    {
+      "issue": "26103",
+      "basic_gross_per_yuan": 0.6236073975044564,
+      "additional_gross_per_yuan": 0.6003395204167156,
+      "basic_after_tax_per_yuan_single": 0.5543818800514074,
+      "additional_after_tax_per_yuan_single": 0.5172689243652673
+    },
+    {
+      "issue": "26104",
+      "basic_gross_per_yuan": 0.49949982992397174,
+      "additional_gross_per_yuan": 0.4514106851307127,
+      "basic_after_tax_per_yuan_single": 0.4550958259870197,
+      "additional_after_tax_per_yuan_single": 0.3981258561364651
+    },
+    {
+      "issue": "26105",
+      "basic_gross_per_yuan": 0.6555531270092682,
+      "additional_gross_per_yuan": 0.6386742713614372,
+      "basic_after_tax_per_yuan_single": 0.5799384636552568,
+      "additional_after_tax_per_yuan_single": 0.5479367251210446
+    },
+    {
+      "issue": "26106",
+      "basic_gross_per_yuan": 0.6043945004021336,
+      "additional_gross_per_yuan": 0.5772840438939283,
+      "basic_after_tax_per_yuan_single": 0.5390115623695493,
+      "additional_after_tax_per_yuan_single": 0.49882454314703756
+    },
+    {
+      "issue": "26107",
+      "basic_gross_per_yuan": 0.7295962206530173,
+      "additional_gross_per_yuan": 0.676780574044245,
+      "basic_after_tax_per_yuan_single": 0.6582025605496797,
+      "additional_after_tax_per_yuan_single": 0.5911081819202398
+    },
+    {
+      "issue": "26108",
+      "basic_gross_per_yuan": 0.7555617521602083,
+      "additional_gross_per_yuan": 0.7079390873918215,
+      "basic_after_tax_per_yuan_single": 0.6789749857554326,
+      "additional_after_tax_per_yuan_single": 0.6160349925983012
+    },
+    {
+      "issue": "26109",
+      "basic_gross_per_yuan": 0.7952509816243213,
+      "additional_gross_per_yuan": 0.7555662872098097,
+      "basic_after_tax_per_yuan_single": 0.710726369326723,
+      "additional_after_tax_per_yuan_single": 0.6541367524526918
+    },
+    {
+      "issue": "26110",
+      "basic_gross_per_yuan": 0.6123787624887331,
+      "additional_gross_per_yuan": 0.5361194997860514,
+      "basic_after_tax_per_yuan_single": 0.5644285940182525,
+      "additional_after_tax_per_yuan_single": 0.4785793225136852
+    },
+    {
+      "issue": "26111",
+      "basic_gross_per_yuan": 0.5808996685851093,
+      "additional_gross_per_yuan": 0.49834477690480794,
+      "basic_after_tax_per_yuan_single": 0.5392453188953534,
+      "additional_after_tax_per_yuan_single": 0.4483595442086903
+    },
+    {
+      "issue": "26112",
+      "basic_gross_per_yuan": 0.6227358978782128,
+      "additional_gross_per_yuan": 0.5485479937998482,
+      "basic_after_tax_per_yuan_single": 0.5727143023298362,
+      "additional_after_tax_per_yuan_single": 0.48852211772472254
+    },
+    {
+      "issue": "26113",
+      "basic_gross_per_yuan": 0.34377641685839894,
+      "additional_gross_per_yuan": 0.2645423405299203,
+      "basic_after_tax_per_yuan_single": 0.33051709553456143,
+      "additional_after_tax_per_yuan_single": 0.24863118045583113
+    },
+    {
+      "issue": "26114",
+      "basic_gross_per_yuan": 0.4972875347152991,
+      "additional_gross_per_yuan": 0.4487559308803055,
+      "basic_after_tax_per_yuan_single": 0.4533259898200816,
+      "additional_after_tax_per_yuan_single": 0.39600205273613936
+    },
+    {
+      "issue": "26115",
+      "basic_gross_per_yuan": 0.5100030514738554,
+      "additional_gross_per_yuan": 0.4640142491725207,
+      "basic_after_tax_per_yuan_single": 0.46349840322692665,
+      "additional_after_tax_per_yuan_single": 0.40820870736991144
+    },
+    {
+      "issue": "26116",
+      "basic_gross_per_yuan": 0.6102575494340632,
+      "additional_gross_per_yuan": 0.5843198271932962,
+      "basic_after_tax_per_yuan_single": 0.5437020015950929,
+      "additional_after_tax_per_yuan_single": 0.5044531697865319
+    },
+    {
+      "issue": "26117",
+      "basic_gross_per_yuan": 0.4386761569463829,
+      "additional_gross_per_yuan": 0.37842208775450104,
+      "basic_after_tax_per_yuan_single": 0.4064368876049486,
+      "additional_after_tax_per_yuan_single": 0.3397349782354957
+    },
+    {
+      "issue": "26118",
+      "basic_gross_per_yuan": 0.5972199430291978,
+      "additional_gross_per_yuan": 0.568674761737984,
+      "basic_after_tax_per_yuan_single": 0.5332719164712005,
+      "additional_after_tax_per_yuan_single": 0.4919371174222822
+    },
+    {
+      "issue": "26119",
+      "basic_gross_per_yuan": 0.5846528460757804,
+      "additional_gross_per_yuan": 0.5535941115982517,
+      "basic_after_tax_per_yuan_single": 0.5232182389084666,
+      "additional_after_tax_per_yuan_single": 0.47987259731049625
+    },
+    {
+      "issue": "26120",
+      "basic_gross_per_yuan": 0.7477613112693758,
+      "additional_gross_per_yuan": 0.6985786827838751,
+      "basic_after_tax_per_yuan_single": 0.6727346330427666,
+      "additional_after_tax_per_yuan_single": 0.6085466689119441
+    },
+    {
+      "issue": "26121",
+      "basic_gross_per_yuan": 0.5982480302171522,
+      "additional_gross_per_yuan": 0.5191628015286804,
+      "basic_after_tax_per_yuan_single": 0.5531240082009876,
+      "additional_after_tax_per_yuan_single": 0.4650139639077883
+    },
+    {
+      "issue": "26122",
+      "basic_gross_per_yuan": 0.6734894971051604,
+      "additional_gross_per_yuan": 0.6094525586827639,
+      "basic_after_tax_per_yuan_single": 0.6133171817113943,
+      "additional_after_tax_per_yuan_single": 0.5372457696310551
+    },
+    {
+      "issue": "26123",
+      "basic_gross_per_yuan": 0.43407535301510636,
+      "additional_gross_per_yuan": 0.37290111992544284,
+      "basic_after_tax_per_yuan_single": 0.4027562444599274,
+      "additional_after_tax_per_yuan_single": 0.33531820397224915
+    }
+  ],
+  "structured_exact": {
+    "compound_6_3": {
+      "n_tickets": 18,
+      "unique_tickets": 18,
+      "cost": 36,
+      "all_outcomes": 21425712,
+      "averaged_over_regular_2026_payout_schedules": {
+        "expected_gross": 20.064847289071317,
+        "expected_after_tax": 18.066323363397164,
+        "expected_net_profit": -17.93367663660284,
+        "after_tax_roi": -0.4981576843500789,
+        "p_any_prize": 0.13969706117584324,
+        "p_break_even": 0.1151944109761629,
+        "p_profit": 0.1151944109761629,
+        "p_zero": 0.860302938824157
+      },
+      "latest_schedule_26123": {
+        "expected_gross": 15.626712708543831,
+        "expected_after_tax": 14.301302789844273,
+        "expected_net_profit": -21.69869721015573,
+        "after_tax_roi": -0.6027415891709924,
+        "p_any_prize": 0.1396970611758433,
+        "p_break_even": 0.10311563975096838,
+        "p_profit": 0.10311563975096838,
+        "p_zero": 0.8603029388241568
+      }
+    },
+    "dantuo_4_6_3": {
+      "n_tickets": 18,
+      "unique_tickets": 18,
+      "cost": 36,
+      "all_outcomes": 21425712,
+      "averaged_over_regular_2026_payout_schedules": {
+        "expected_gross": 20.06484728907135,
+        "expected_after_tax": 18.164562585646564,
+        "expected_net_profit": -17.835437414353436,
+        "after_tax_roi": -0.49542881706537323,
+        "p_any_prize": 0.2019703709262964,
+        "p_break_even": 0.06667839926371096,
+        "p_profit": 0.06667839926371096,
+        "p_zero": 0.7980296290737035
+      },
+      "latest_schedule_26123": {
+        "expected_gross": 15.626712708543884,
+        "expected_after_tax": 14.40295635449601,
+        "expected_net_profit": -21.597043645503987,
+        "after_tax_roi": -0.5999178790417774,
+        "p_any_prize": 0.20197037092629638,
+        "p_break_even": 0.05440313955494221,
+        "p_profit": 0.05440313955494221,
+        "p_zero": 0.7980296290737035
+      }
+    },
+    "repeat_one_18x": {
+      "n_tickets": 18,
+      "unique_tickets": 1,
+      "cost": 36,
+      "all_outcomes": 21425712,
+      "averaged_over_regular_2026_payout_schedules": {
+        "expected_gross": 20.06484728907131,
+        "expected_after_tax": 18.091615493095926,
+        "expected_net_profit": -17.908384506904074,
+        "after_tax_roi": -0.49745512519177976,
+        "p_any_prize": 0.06670476108331894,
+        "p_break_even": 0.06670476108331894,
+        "p_profit": 0.06670476108331894,
+        "p_zero": 0.9332952389166812
+      },
+      "latest_schedule_26123": {
+        "expected_gross": 15.626712708543828,
+        "expected_after_tax": 14.335402940168336,
+        "expected_net_profit": -21.664597059831664,
+        "after_tax_roi": -0.6017943627731017,
+        "p_any_prize": 0.06670476108331895,
+        "p_break_even": 0.06670476108331895,
+        "p_profit": 0.06670476108331895,
+        "p_zero": 0.9332952389166811
+      }
+    },
+    "additional_dantuo_2_4_3": {
+      "n_tickets": 12,
+      "unique_tickets": 12,
+      "cost": 36,
+      "all_outcomes": 21425712,
+      "averaged_over_regular_2026_payout_schedules": {
+        "expected_gross": 18.157715090784734,
+        "expected_after_tax": 15.911917946557207,
+        "expected_net_profit": -20.0880820534428,
+        "after_tax_roi": -0.5580022792623,
+        "p_any_prize": 0.13969706117584324,
+        "p_break_even": 0.04260192102675692,
+        "p_profit": 0.04260192102675692,
+        "p_zero": 0.860302938824157
+      },
+      "latest_schedule_26123": {
+        "expected_gross": 13.42444031731594,
+        "expected_after_tax": 11.982704780125863,
+        "expected_net_profit": -24.017295219874136,
+        "after_tax_roi": -0.6671470894409482,
+        "p_any_prize": 0.1396970611758433,
+        "p_break_even": 0.027735741057286687,
+        "p_profit": 0.027735741057286687,
+        "p_zero": 0.8603029388241568
+      }
+    }
+  },
+  "random_portfolio_mc": {
+    "draws": 500000,
+    "seed": 20261029,
+    "scope": "one fixed random 18-ticket portfolio and its first 12 tickets, latest 26123 payout schedule; sampling uncertainty only; not an optimum",
+    "results": {
+      "random18": {
+        "any": {
+          "rate": 0.715052,
+          "mc_standard_error": 0.0006383613981061198
+        },
+        "break_even": {
+          "rate": 0.014004,
+          "mc_standard_error": 0.00016617995055962678
+        },
+        "profit": {
+          "rate": 0.014004,
+          "mc_standard_error": 0.00016617995055962678
+        }
+      },
+      "random12_additional": {
+        "any": {
+          "rate": 0.592694,
+          "mc_standard_error": 0.0006948493683727431
+        },
+        "break_even": {
+          "rate": 0.008102,
+          "mc_standard_error": 0.00012677821260768745
+        },
+        "profit": {
+          "rate": 0.008102,
+          "mc_standard_error": 0.00012677821260768745
+        }
+      }
+    }
+  },
+  "historical": {
+    "scope": "historical descriptive sensitivity, not untouched validation; 500 randomized runs share the same actual draw sequence; intervals use draw-level paired differences, not 500 independent histories",
+    "periods": [
+      {
+        "issue": "26001",
+        "date": "2026-01-03"
+      },
+      {
+        "issue": "26002",
+        "date": "2026-01-05"
+      },
+      {
+        "issue": "26003",
+        "date": "2026-01-07"
+      },
+      {
+        "issue": "26004",
+        "date": "2026-01-10"
+      },
+      {
+        "issue": "26005",
+        "date": "2026-01-12"
+      },
+      {
+        "issue": "26006",
+        "date": "2026-01-14"
+      },
+      {
+        "issue": "26007",
+        "date": "2026-01-17"
+      },
+      {
+        "issue": "26008",
+        "date": "2026-01-19"
+      },
+      {
+        "issue": "26009",
+        "date": "2026-01-21"
+      },
+      {
+        "issue": "26010",
+        "date": "2026-01-24"
+      },
+      {
+        "issue": "26011",
+        "date": "2026-01-26"
+      },
+      {
+        "issue": "26012",
+        "date": "2026-01-28"
+      },
+      {
+        "issue": "26013",
+        "date": "2026-01-31"
+      },
+      {
+        "issue": "26014",
+        "date": "2026-02-02"
+      },
+      {
+        "issue": "26015",
+        "date": "2026-02-04"
+      },
+      {
+        "issue": "26016",
+        "date": "2026-02-07"
+      },
+      {
+        "issue": "26017",
+        "date": "2026-02-09"
+      },
+      {
+        "issue": "26018",
+        "date": "2026-02-11"
+      },
+      {
+        "issue": "26019",
+        "date": "2026-02-25"
+      },
+      {
+        "issue": "26020",
+        "date": "2026-02-28"
+      },
+      {
+        "issue": "26021",
+        "date": "2026-03-02"
+      },
+      {
+        "issue": "26022",
+        "date": "2026-03-04"
+      },
+      {
+        "issue": "26023",
+        "date": "2026-03-07"
+      },
+      {
+        "issue": "26024",
+        "date": "2026-03-09"
+      },
+      {
+        "issue": "26025",
+        "date": "2026-03-11"
+      },
+      {
+        "issue": "26026",
+        "date": "2026-03-14"
+      },
+      {
+        "issue": "26027",
+        "date": "2026-03-16"
+      },
+      {
+        "issue": "26028",
+        "date": "2026-03-18"
+      },
+      {
+        "issue": "26029",
+        "date": "2026-03-21"
+      },
+      {
+        "issue": "26030",
+        "date": "2026-03-23"
+      },
+      {
+        "issue": "26031",
+        "date": "2026-03-25"
+      },
+      {
+        "issue": "26032",
+        "date": "2026-03-28"
+      },
+      {
+        "issue": "26033",
+        "date": "2026-03-30"
+      },
+      {
+        "issue": "26034",
+        "date": "2026-04-01"
+      },
+      {
+        "issue": "26035",
+        "date": "2026-04-04"
+      },
+      {
+        "issue": "26036",
+        "date": "2026-04-06"
+      },
+      {
+        "issue": "26037",
+        "date": "2026-04-08"
+      },
+      {
+        "issue": "26038",
+        "date": "2026-04-11"
+      },
+      {
+        "issue": "26039",
+        "date": "2026-04-13"
+      },
+      {
+        "issue": "26040",
+        "date": "2026-04-15"
+      },
+      {
+        "issue": "26041",
+        "date": "2026-04-18"
+      },
+      {
+        "issue": "26042",
+        "date": "2026-04-20"
+      },
+      {
+        "issue": "26043",
+        "date": "2026-04-22"
+      },
+      {
+        "issue": "26044",
+        "date": "2026-04-25"
+      },
+      {
+        "issue": "26045",
+        "date": "2026-04-27"
+      },
+      {
+        "issue": "26046",
+        "date": "2026-04-29"
+      },
+      {
+        "issue": "26047",
+        "date": "2026-05-02"
+      },
+      {
+        "issue": "26048",
+        "date": "2026-05-04"
+      },
+      {
+        "issue": "26049",
+        "date": "2026-05-06"
+      },
+      {
+        "issue": "26067",
+        "date": "2026-06-17"
+      },
+      {
+        "issue": "26068",
+        "date": "2026-06-20"
+      },
+      {
+        "issue": "26069",
+        "date": "2026-06-22"
+      },
+      {
+        "issue": "26070",
+        "date": "2026-06-24"
+      },
+      {
+        "issue": "26071",
+        "date": "2026-06-27"
+      },
+      {
+        "issue": "26072",
+        "date": "2026-06-29"
+      },
+      {
+        "issue": "26073",
+        "date": "2026-07-01"
+      },
+      {
+        "issue": "26074",
+        "date": "2026-07-04"
+      },
+      {
+        "issue": "26075",
+        "date": "2026-07-06"
+      },
+      {
+        "issue": "26076",
+        "date": "2026-07-08"
+      },
+      {
+        "issue": "26077",
+        "date": "2026-07-11"
+      },
+      {
+        "issue": "26078",
+        "date": "2026-07-13"
+      },
+      {
+        "issue": "26079",
+        "date": "2026-07-15"
+      },
+      {
+        "issue": "26080",
+        "date": "2026-07-18"
+      },
+      {
+        "issue": "26081",
+        "date": "2026-07-20"
+      },
+      {
+        "issue": "26082",
+        "date": "2026-07-22"
+      },
+      {
+        "issue": "26083",
+        "date": "2026-07-25"
+      },
+      {
+        "issue": "26084",
+        "date": "2026-07-27"
+      },
+      {
+        "issue": "26085",
+        "date": "2026-07-29"
+      },
+      {
+        "issue": "26086",
+        "date": "2026-08-01"
+      },
+      {
+        "issue": "26087",
+        "date": "2026-08-03"
+      },
+      {
+        "issue": "26088",
+        "date": "2026-08-05"
+      },
+      {
+        "issue": "26089",
+        "date": "2026-08-08"
+      },
+      {
+        "issue": "26090",
+        "date": "2026-08-10"
+      },
+      {
+        "issue": "26091",
+        "date": "2026-08-12"
+      },
+      {
+        "issue": "26092",
+        "date": "2026-08-15"
+      },
+      {
+        "issue": "26093",
+        "date": "2026-08-17"
+      },
+      {
+        "issue": "26094",
+        "date": "2026-08-19"
+      },
+      {
+        "issue": "26095",
+        "date": "2026-08-22"
+      },
+      {
+        "issue": "26096",
+        "date": "2026-08-24"
+      },
+      {
+        "issue": "26097",
+        "date": "2026-08-26"
+      },
+      {
+        "issue": "26098",
+        "date": "2026-08-29"
+      },
+      {
+        "issue": "26099",
+        "date": "2026-08-31"
+      },
+      {
+        "issue": "26100",
+        "date": "2026-09-02"
+      },
+      {
+        "issue": "26101",
+        "date": "2026-09-05"
+      },
+      {
+        "issue": "26102",
+        "date": "2026-09-07"
+      },
+      {
+        "issue": "26103",
+        "date": "2026-09-09"
+      },
+      {
+        "issue": "26104",
+        "date": "2026-09-12"
+      },
+      {
+        "issue": "26105",
+        "date": "2026-09-14"
+      },
+      {
+        "issue": "26106",
+        "date": "2026-09-16"
+      },
+      {
+        "issue": "26107",
+        "date": "2026-09-19"
+      },
+      {
+        "issue": "26108",
+        "date": "2026-09-21"
+      },
+      {
+        "issue": "26109",
+        "date": "2026-09-23"
+      },
+      {
+        "issue": "26110",
+        "date": "2026-09-26"
+      },
+      {
+        "issue": "26111",
+        "date": "2026-09-28"
+      },
+      {
+        "issue": "26112",
+        "date": "2026-09-30"
+      },
+      {
+        "issue": "26113",
+        "date": "2026-10-05"
+      },
+      {
+        "issue": "26114",
+        "date": "2026-10-07"
+      },
+      {
+        "issue": "26115",
+        "date": "2026-10-10"
+      },
+      {
+        "issue": "26116",
+        "date": "2026-10-12"
+      },
+      {
+        "issue": "26117",
+        "date": "2026-10-14"
+      },
+      {
+        "issue": "26118",
+        "date": "2026-10-17"
+      },
+      {
+        "issue": "26119",
+        "date": "2026-10-19"
+      },
+      {
+        "issue": "26120",
+        "date": "2026-10-21"
+      },
+      {
+        "issue": "26121",
+        "date": "2026-10-24"
+      },
+      {
+        "issue": "26122",
+        "date": "2026-10-26"
+      },
+      {
+        "issue": "26123",
+        "date": "2026-10-28"
+      }
+    ],
+    "strategies": {
+      "random18": {
+        "issues": 106,
+        "cost_per_run": 3816,
+        "runs": 500,
+        "median_roi": -0.7265461215932913,
+        "roi_p05_p95": [
+          -0.8032101677148847,
+          -0.5883254716981134
+        ],
+        "mean_roi": -0.6126317610062892,
+        "fraction_runs_profit": 0.02,
+        "mean_prize_issue_rate": 0.7124528301886792,
+        "mean_break_even_issue_rate": 0.016981132075471698,
+        "mean_paired_net_prize_difference_per_issue": 0.0,
+        "paired_issue_normal95_interval": [
+          0.0,
+          0.0
+        ],
+        "largest_single_draw_share_of_all_returns": 0.1961708491938694
+      },
+      "hot60_18": {
+        "issues": 106,
+        "cost_per_run": 3816,
+        "runs": 500,
+        "median_roi": -0.7287735849056604,
+        "roi_p05_p95": [
+          -0.8027253668763102,
+          -0.5770047169811321
+        ],
+        "mean_roi": -0.667904716981132,
+        "fraction_runs_profit": 0.014,
+        "mean_prize_issue_rate": 0.6980377358490566,
+        "mean_break_even_issue_rate": 0.017603773584905662,
+        "mean_paired_net_prize_difference_per_issue": -1.98982641509434,
+        "paired_issue_normal95_interval": [
+          -8.043142631750644,
+          4.063489801561963
+        ],
+        "largest_single_draw_share_of_all_returns": 0.10225526318032163
+      },
+      "cold60_18": {
+        "issues": 106,
+        "cost_per_run": 3816,
+        "runs": 500,
+        "median_roi": -0.7220911949685535,
+        "roi_p05_p95": [
+          -0.7956236897274632,
+          -0.5614910901467507
+        ],
+        "mean_roi": -0.6055442348008386,
+        "fraction_runs_profit": 0.022,
+        "mean_prize_issue_rate": 0.6994339622641509,
+        "mean_break_even_issue_rate": 0.01939622641509434,
+        "mean_paired_net_prize_difference_per_issue": 0.25515094339622635,
+        "paired_issue_normal95_interval": [
+          -0.8975133173432291,
+          1.407815204135682
+        ],
+        "largest_single_draw_share_of_all_returns": 0.19264607872003675
+      },
+      "compound_6_3": {
+        "issues": 106,
+        "cost_per_run": 3816,
+        "runs": 500,
+        "median_roi": -0.7713574423480084,
+        "roi_p05_p95": [
+          -0.8762054507337526,
+          -0.38672693920335505
+        ],
+        "mean_roi": -0.7147023060796646,
+        "fraction_runs_profit": 0.006,
+        "mean_prize_issue_rate": 0.13756603773584905,
+        "mean_break_even_issue_rate": 0.11235849056603774,
+        "mean_paired_net_prize_difference_per_issue": -3.6745396226415092,
+        "paired_issue_normal95_interval": [
+          -9.358604209310847,
+          2.009524964027828
+        ],
+        "largest_single_draw_share_of_all_returns": 0.017518205265749116
+      },
+      "dantuo_4_6_3": {
+        "issues": 106,
+        "cost_per_run": 3816,
+        "runs": 500,
+        "median_roi": -0.772143605870021,
+        "roi_p05_p95": [
+          -0.8809748427672957,
+          -0.4184093291404613
+        ],
+        "mean_roi": -0.7059171907756813,
+        "fraction_runs_profit": 0.022,
+        "mean_prize_issue_rate": 0.1990188679245283,
+        "mean_break_even_issue_rate": 0.06405660377358491,
+        "mean_paired_net_prize_difference_per_issue": -3.358275471698113,
+        "paired_issue_normal95_interval": [
+          -9.099335071998537,
+          2.3827841286023115
+        ],
+        "largest_single_draw_share_of_all_returns": 0.024594108107144765
+      },
+      "random12_additional": {
+        "issues": 106,
+        "cost_per_run": 3816,
+        "runs": 500,
+        "median_roi": -0.8187893081761006,
+        "roi_p05_p95": [
+          -0.8731918238993711,
+          -0.6792059748427673
+        ],
+        "mean_roi": -0.77674213836478,
+        "fraction_runs_profit": 0.02,
+        "mean_prize_issue_rate": 0.5659245283018868,
+        "mean_break_even_issue_rate": 0.010075471698113207,
+        "mean_paired_net_prize_difference_per_issue": -5.90797358490566,
+        "paired_issue_normal95_interval": [
+          -11.33581262619548,
+          -0.48013454361583996
+        ],
+        "largest_single_draw_share_of_all_returns": 0.015665201795406314
+      },
+      "repeat_one_18x": {
+        "issues": 106,
+        "cost_per_run": 3816,
+        "runs": 500,
+        "median_roi": -0.7830188679245282,
+        "roi_p05_p95": [
+          -0.9198113207547169,
+          -0.04646226415094403
+        ],
+        "mean_roi": -0.7105471698113208,
+        "fraction_runs_profit": 0.044,
+        "mean_prize_issue_rate": 0.06658490566037736,
+        "mean_break_even_issue_rate": 0.06658490566037736,
+        "mean_paired_net_prize_difference_per_issue": -3.524954716981132,
+        "paired_issue_normal95_interval": [
+          -9.030746316170902,
+          1.9808368822086373
+        ],
+        "largest_single_draw_share_of_all_returns": 0.012385111791930121
+      }
+    }
+  }
+}

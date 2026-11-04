@@ -1,0 +1,21 @@
+{
+  "dlt_analysis": {
+    "exact_probability_checks": "passed",
+    "total": 21425712,
+    "any_prize_probability": 0.06670476108331896,
+    "default_gross_return": 1.0592602476874513,
+    "default_prize_levels": 9
+  },
+  "lottopilot": {
+    "training_slice_check": "passed",
+    "future_guard_rejects_strictly_future_issue": false,
+    "default_4_plus_2_level": "4",
+    "default_4_plus_1_level": "5"
+  },
+  "baseline_metric_null_expectation": {
+    "single_ticket_front_hits": 0.7142857142857143,
+    "best_of_five_iid_tickets_front_hits": 1.580105049000673,
+    "apparent_lift_without_predictive_signal": 0.8658193347149586,
+    "note": "IID illustration; actual diverse selection changes dependence. Not measured platform performance."
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "retrieved_date": "2026-10-29",
+  "official_endpoint": "https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry?gameNo=85&provinceId=0&pageSize=100&isVerify=1&pageNo={page}",
+  "pages": [
+    1,
+    2
+  ],
+  "github_history": "https://raw.githubusercontent.com/616390260/daletou-predictor/c2cead9a06671c43ce90352964147284c6917657/data/export/history.json",
+  "crosscheck": "https://www.shsportslottery.com/dlt/kjgg.html",
+  "files": {
+    "github_history.json": "a21e17f17d77741d27b0ba85c28429e60a57c97b892222f2f86e11d12dcc6a8d",
+    "official_page1.json": "e5fa2d1a0b34253a717d8af4715e3181099813136045dd4839bbf467dd4a63d5",
+    "official_page2.json": "5202e100faa056ead4c12a8de74633f1a8608460c366018d5fb4979cf6e18470"
+  }
+}

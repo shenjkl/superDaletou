@@ -1,0 +1,25 @@
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# JavaScript dependencies and test output
+node_modules/
+coverage/
+
+# Local runtime data and logs
+runtime/
+research/sources/
+*.sqlite
+*.sqlite3
+*.db
+*.log
+.env
+.env.*
+
+# OS/editor temporary files
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp

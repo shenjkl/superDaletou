@@ -1,0 +1,108 @@
+{
+  "checked_date": "2026-10-29",
+  "scope": "Focused source review and pure-function offline verification. Not a full application or historical return reproduction.",
+  "repositories": [
+    {
+      "repository": "0HeiMao/dlt-analysis",
+      "revision": "554ef60f3112eb9ea8d9efb946fd53021dd495a9",
+      "files": [
+        {
+          "path": "dlt_tool.py",
+          "blob_sha": "d5e44557a2488727be5002f74ef53e3dfca50f0f"
+        },
+        {
+          "path": "math_model.md",
+          "blob_sha": "7391e7b7edd6e676a2cd46f8a0e0a0094d41a41a"
+        }
+      ]
+    },
+    {
+      "repository": "616390260/daletou-predictor",
+      "revision": "c2cead9a06671c43ce90352964147284c6917657",
+      "files": [
+        {
+          "path": "backend/src/analytics/significance.py",
+          "blob_sha": "a83f66def6850d3d71a4e6e280eab26f02404d7a"
+        },
+        {
+          "path": "backend/src/config.py",
+          "blob_sha": "4c1056120a2719df1c4d1cdfdd37d18a97b6ef46"
+        },
+        {
+          "path": "backend/src/export/to_json.py",
+          "blob_sha": "132f279c458707c04d417025181f4a67d08d1317"
+        },
+        {
+          "path": "backend/src/models/base.py",
+          "blob_sha": "17ee1c4853919d815326b94ae31bbeef17073b8e"
+        },
+        {
+          "path": "backend/src/models/lstm_model.py",
+          "blob_sha": "7bf2c03eb924c1fcba535237cb02bd53b8347b1b"
+        },
+        {
+          "path": "backend/src/models/random_model.py",
+          "blob_sha": "2aa46a224235fde4cfe1f49049000b02a8632fe0"
+        },
+        {
+          "path": "backend/src/models/transformer_model.py",
+          "blob_sha": "8715246bab4b57cc3d3da42d6daee8ac55b43c6b"
+        },
+        {
+          "path": "backend/src/models/xgboost_model.py",
+          "blob_sha": "71153c8cebb447883c7f5a1ce453719e2cd977ba"
+        },
+        {
+          "path": "backend/src/tasks/backtest.py",
+          "blob_sha": "517a9b6c7c757f6c45fd66045005b3beb7148957"
+        },
+        {
+          "path": "backend/src/tasks/evaluate.py",
+          "blob_sha": "065401c0136a769f0461996d8422a3f96100715a"
+        },
+        {
+          "path": "backend/src/utils/prizes.py",
+          "blob_sha": "efc5cf18dfa7461ccf7a0e76d20ca41350113a28"
+        },
+        {
+          "path": "data/lstm_meta.json",
+          "blob_sha": "ee55204b82f7c8b6425f0696ae42e0a756548161"
+        },
+        {
+          "path": "data/transformer_meta.json",
+          "blob_sha": "d7fc6986b55789ab9086d17611d521318a7d38cb"
+        },
+        {
+          "path": "docs/KNOWN_ISSUES.md",
+          "blob_sha": "d94458393f451d066b95a47c82ec9b8501f46dc5"
+        }
+      ]
+    },
+    {
+      "repository": "Xwordsman/LottoPilot",
+      "revision": "fb9f5535132b340db92885387f27a5f8e76afad0",
+      "files": [
+        {
+          "path": "backend/app/services/backtest.py",
+          "blob_sha": "d8209c6943c17aad607aa121c185b8527c6761c8"
+        },
+        {
+          "path": "backend/app/services/backtest_core.py",
+          "blob_sha": "086ac7b5f7c3801844c5545086f9b7397ba1a5e8"
+        },
+        {
+          "path": "backend/app/services/recommendation/evaluate.py",
+          "blob_sha": "484ea258684c642d25504f190688ea46dce935ca"
+        },
+        {
+          "path": "backend/app/services/recommendation/prize_rules.py",
+          "blob_sha": "5f015944c57d853a832ddf98cd3898c3b1c1db8e"
+        },
+        {
+          "path": "backend/app/services/recommendation/scoring.py",
+          "blob_sha": "1825128a3e794a9c155c5d25549b78aef9d0b493"
+        }
+      ]
+    }
+  ]
+}

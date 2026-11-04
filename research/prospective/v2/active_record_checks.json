@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "packet_replay_portfolios": 4500,
+  "undrawn_target_refused": true,
+  "ledger_unchanged": true,
+  "valid_settled_issues": 0,
+  "pending_issues": [
+    "26124"
+  ],
+  "isolated_unit_tests_passed": 15
+}

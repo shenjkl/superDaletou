@@ -1,0 +1,169 @@
+{
+  "date": "2026-10-29",
+  "input_version": "v0.2",
+  "output_version": "v0.4",
+  "prd_sha256": "fad8a06d9c525c4e5a4037c04516b13faacb3de79ae1f486b4d759ebd34fdf24",
+  "rounds": [
+    {
+      "round": 1,
+      "input": "v0.2",
+      "new_findings": {
+        "S0": 2,
+        "S1": 7,
+        "S2": 2
+      },
+      "verdict": "补充后重审"
+    },
+    {
+      "round": 2,
+      "input": "v0.3",
+      "new_findings": {
+        "S0": 0,
+        "S1": 2,
+        "S2": 1
+      },
+      "verdict": "补充后重审"
+    },
+    {
+      "round": 3,
+      "input": "v0.4",
+      "new_findings": {
+        "S0": 0,
+        "S1": 0,
+        "S2": 0
+      },
+      "verdict": "可以进入研发"
+    }
+  ],
+  "issues": [
+    {
+      "id": "F01",
+      "severity": "S0",
+      "source": "v0.2 §9.2/§17.2 T01",
+      "issue": "计划启用缺少必填项、重试耗尽和重入的可执行合同",
+      "fix": "R36/R42、§9.9计划合同；AC40/AC47",
+      "owner": "产品/研发",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "F02",
+      "severity": "S0",
+      "source": "v0.2 R24/§17.2 T04",
+      "issue": "多副本聚合、缺对和无协议的运行结果不完整",
+      "fix": "R36/R44、配置/指标合同；AC49/AC55",
+      "owner": "产品/数据",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "F03",
+      "severity": "S1",
+      "source": "v0.2 R15",
+      "issue": "所有来源版本变化统一失效，范围过宽",
+      "fix": "仅匹配实际依赖；来源更正单独复核；AC51",
+      "owner": "产品/研发",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "F04",
+      "severity": "S1",
+      "source": "v0.2 R29/§10",
+      "issue": "异常暂停后解除依据不明确",
+      "fix": "R37阻断原因与处置凭证，AC41",
+      "owner": "产品/研发/测试",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "F05",
+      "severity": "S1",
+      "source": "v0.2 R31",
+      "issue": "更正版本保留但汇总取用缺少唯一性规则",
+      "fix": "R38当前结果组原子替换，AC42",
+      "owner": "研发/数据",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "F06",
+      "severity": "S1",
+      "source": "v0.2 R22/available_at字段",
+      "issue": "历史可用时间未知与严格重放要求冲突",
+      "fix": "R39双模式，未知发布时间保留空；AC43",
+      "owner": "数据/测试",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "F07",
+      "severity": "S1",
+      "source": "v0.2 R27/R28/时间证明字段",
+      "issue": "本地时间与可信证明的资格关系、截止相等未定义",
+      "fix": "R40按预登记等级校验、截止相等拒绝；AC44/AC45",
+      "owner": "产品/数据",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "F08",
+      "severity": "S1",
+      "source": "v0.2 R03/数据快照状态",
+      "issue": "号码资格与奖金结算资格共用可用概念",
+      "fix": "独立numbers_usable/settlement_ready；AC50",
+      "owner": "产品/数据/研发",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "F09",
+      "severity": "S1",
+      "source": "v0.2 §13/T06",
+      "issue": "持久化完整性、恢复及本机跨站写操作无验收合同",
+      "fix": "R43原子提交、恢复校验、本机操作校验与脱敏导出；AC48/AC52",
+      "owner": "研发/测试",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "F10",
+      "severity": "S2",
+      "source": "v0.2 R35/实验关闭状态",
+      "issue": "关闭实验后已固定待开奖包如何处置未说明",
+      "fix": "R41关闭只阻止新登记，既有包继续计算/更正；AC46",
+      "owner": "产品/测试",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "F11",
+      "severity": "S2",
+      "source": "v0.2 §7/§10/列表交互",
+      "issue": "核心状态被称为建议集合，排序描述缺少确定性",
+      "fix": "改为业务合同；默认排序明确，数据库命名可不同",
+      "owner": "产品/设计/测试",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "G01",
+      "severity": "S1",
+      "source": "v0.3 R04/R38/current_group字段",
+      "issue": "更正已确认但复算未成功时，旧值仍可能当作可信当前值",
+      "fix": "R45撤回有效性并显示完整性，AC53/AC55",
+      "owner": "数据/研发/测试",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "G02",
+      "severity": "S1",
+      "source": "v0.3 R16/R11",
+      "issue": "同键重发失败/取消请求与主动重试未区分",
+      "fix": "同键返回原终态、冲突拒绝、新键重试关联retry_of；AC54",
+      "owner": "研发/测试",
+      "status": "fixed_in_requirements"
+    },
+    {
+      "id": "G03",
+      "severity": "S2",
+      "source": "v0.3 §16/§18",
+      "issue": "新增验收与版本行前有空行，Markdown表格被断开",
+      "fix": "连接表格续行，复核全部编号和引用",
+      "owner": "产品/文档维护",
+      "status": "fixed_in_requirements"
+    }
+  ],
+  "rules": 45,
+  "acceptance_cases": 55,
+  "implementation_verified": false
+}

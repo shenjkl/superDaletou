@@ -1,0 +1,66 @@
+{
+  "experiment_id": "dlt-paper-v2",
+  "version": 2,
+  "mode": "prospective-paper-only",
+  "history_window": 60,
+  "replicates": 500,
+  "cost_yuan_per_strategy_replicate_issue": 36,
+  "seed_namespace": "dlt-paper-v2-frozen-20261029",
+  "generator": "Python random.Random with SHA256-derived integer seed; weighted exponential keys log(U)/weight; within-portfolio deduplication",
+  "strategies": [
+    "random18",
+    "hot60_18",
+    "cold60_18",
+    "compound_hot",
+    "compound_random",
+    "dantuo_hot",
+    "dantuo_random",
+    "random12_additional",
+    "repeat_one_18x"
+  ],
+  "comparisons": {
+    "primary": [
+      [
+        "hot60_18",
+        "random18"
+      ],
+      [
+        "cold60_18",
+        "random18"
+      ]
+    ],
+    "structure_matched_exploratory": [
+      [
+        "compound_hot",
+        "compound_random"
+      ],
+      [
+        "dantuo_hot",
+        "dantuo_random"
+      ]
+    ]
+  },
+  "primary_measure": "paired after-tax net prize difference per actual issue, averaged across all precommitted replicates",
+  "frequency_weights": "counts in last 60 strictly prior draws plus 1; cold weights are reciprocals",
+  "draw_weekdays_python": [
+    0,
+    2,
+    5
+  ],
+  "internal_freeze_hour_shanghai": 18,
+  "first_target_issue": "26124",
+  "first_planned_draw_date": "2026-10-31",
+  "schedule_basis": "Inferred from latest official completed issue 26123 and Monday/Wednesday/Saturday rule; date is not a current-issue API confirmation. A schedule change requires recording an exception, never backdating.",
+  "promotions": "exclude flagged promotional issues from conventional-return analysis, retain packet and exclusion reason; do not silently substitute another target",
+  "settlement": "published actual per-ticket payouts; same-person same-game same-issue aggregation inside each alternative strategy/replicate; no cross-alternative aggregation; >10000 yuan taxed at 20%; no real purchases",
+  "missing_prizes": "block settlement if any matched base/additional award is missing; never replace unknown by zero or estimated 80%",
+  "payout_counterfactual": "price-taking scenario; published floating awards are not recomputed for hypothetical extra winners",
+  "stages": {
+    "30_valid_issues": "operational integrity review only",
+    "100_valid_issues": "descriptive paired review; not an automatic efficacy claim"
+  },
+  "statistical_policy": "No significance or profitability certification from 30/100 draws or 500 shared-history replicates. Any future formal decision rule/power design must be frozen in a new protocol before its holdout begins. Existing experiment remains descriptive prospective evidence.",
+  "integrity": "exclusive-create packet/result files, source and code SHA256, replay check, append-only hash-chain ledger; local evidence only, no independent trusted timestamp certificate",
+  "automation": "none",
+  "timing_eligibility": "Require generation before the actual official sale-end timestamp, source-receipt retrieval before generation, and actual draw date equal to planned date; otherwise retain as excluded anomaly. Missing official sale-end blocks settlement."
+}

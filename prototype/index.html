@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>大乐透研究台</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23eef2ff%22/%3E%3Ccircle cx=%2210%22 cy=%2211%22 r=%223%22 fill=%22%23365dca%22/%3E%3Ccircle cx=%2222%22 cy=%2211%22 r=%223%22 fill=%22%23365dca%22/%3E%3Ccircle cx=%2216%22 cy=%2222%22 r=%223%22 fill=%22%23365dca%22/%3E%3C/svg%3E"><link rel="stylesheet" href="styles.css"></head>
+<body>
+<!-- THESIS: 以研究日程组织任务，先确认证据边界再进入训练或决策。
+OWN-WORLD: 灰蓝工作面、白色台账、钴蓝操作、文字化研究状态。
+STORY: 看清当前实验所在阶段，比较方案，登记新假设并进入纸面验证。
+FIRST VIEWPORT: 左侧固定导航，中央研究日程，右侧当前证据和下一步，创建实验在页首右侧。
+FORM: research calendar, candidate 4, seed c156bdfc. Prototype-only interaction; research records remain read-only.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md -->
+<a class="skip-link" href="#main">跳到主要内容</a>
+<aside class="sidebar" id="sidebar">
+ <a class="brand" href="#overview" aria-label="大乐透研究台首页"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span>大乐透研究台<small>个人研究工作台</small></span></a>
+ <nav id="navigation" aria-label="主导航"></nav>
+ <div class="side-foot"><span class="status-dot"></span><span>本地工作空间<small>研究快照 / 2026-10-29</small></span><button class="icon-button" data-action="help" aria-label="查看使用说明" id="help-icon"></button></div>
+</aside>
+<div class="workspace">
+ <header class="topbar"><div class="topbar-left"><button class="icon-button menu-button" data-action="menu" aria-label="打开导航" aria-expanded="false" id="menu-button"></button><span id="breadcrumb">研究概览</span><span class="top-divider"></span><span class="workspace-name">个人空间</span></div><div class="topbar-right"><span class="snapshot-label">历史研究基线：第 26123 期</span><button class="text-button" data-action="help">使用说明</button><span class="avatar" aria-label="个人用户">我</span></div></header>
+ <div id="connection-notice" class="connection-notice" role="status" aria-live="polite" hidden></div>
+ <main id="main" tabindex="-1"></main>
+ <footer class="page-footer"><span>大乐透研究台 · 个人研究工作台</span><span>所有方案均为纸面研究，无购票功能</span></footer>
+</div>
+<div id="scrim" class="scrim" hidden></div>
+<section id="drawer" class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden><header class="drawer-head"><div><span class="tag" id="drawer-tag">配置</span><h2 id="drawer-title"></h2></div><button class="icon-button" data-action="close" aria-label="关闭面板" id="drawer-close"></button></header><div id="drawer-content" class="drawer-content"></div></section>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<script src="data.js"></script><script src="calc-engine.js"></script><script src="candidate-engine.js"></script><script src="research-write-journal.js"></script><script src="fixed-experiment-journal.js"></script><script src="task-write-journal.js"></script><script src="training-search-journal.js"></script><script src="update-write-journal.js"></script><script src="declaration-write-journal.js"></script><script src="holdout-write-journal.js"></script><script src="fixed-evaluation-write-journal.js"></script><script src="prospective-closure-write-journal.js"></script><script src="rolling-plan-write-journal.js"></script><script src="source-write-journal.js"></script><script src="paper-write-journal.js"></script><script src="pair-evaluation-journal.js"></script><script src="app.js"></script>
+</body></html>

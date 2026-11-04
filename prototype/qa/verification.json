@@ -1,0 +1,27 @@
+{
+  "status": "passed",
+  "viewports": [
+    1440,
+    390
+  ],
+  "pages": 7,
+  "flows": [
+    "navigation",
+    "rule-switch",
+    "combination-cost",
+    "unequal-budget",
+    "future-boundary",
+    "training-invalid-cancel-complete",
+    "matched-control-wizard",
+    "sealed-record",
+    "mobile-navigation",
+    "three-form-cancel-no-submit",
+    "budget-actual-cost",
+    "snapshot-cutoff-limit",
+    "worker-recalculation-126",
+    "stale-results-hidden"
+  ],
+  "browser_errors": [],
+  "external_requests": [],
+  "frozen_research_unchanged": true
+}

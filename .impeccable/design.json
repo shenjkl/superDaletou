@@ -1,0 +1,399 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-29T08:06:00.919Z",
+  "title": "Design System: 大乐透研究台",
+  "extensions": {
+    "colorMeta": {
+      "bg": {
+        "role": "neutral",
+        "displayName": "冷灰蓝工作面",
+        "tonalRamp": [
+          "oklch(15% 0.0062 255.47)",
+          "oklch(26% 0.0062 255.47)",
+          "oklch(38% 0.0062 255.47)",
+          "oklch(49% 0.0062 255.47)",
+          "oklch(61% 0.0062 255.47)",
+          "oklch(72% 0.0062 255.47)",
+          "oklch(84% 0.0062 255.47)",
+          "oklch(95% 0.0062 255.47)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "白色台账",
+        "tonalRamp": [
+          "oklch(15% 0.0000 89.88)",
+          "oklch(26% 0.0000 89.88)",
+          "oklch(38% 0.0000 89.88)",
+          "oklch(49% 0.0000 89.88)",
+          "oklch(61% 0.0000 89.88)",
+          "oklch(72% 0.0000 89.88)",
+          "oklch(84% 0.0000 89.88)",
+          "oklch(95% 0.0000 89.88)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "墨蓝",
+        "tonalRamp": [
+          "oklch(15% 0.0512 257.90)",
+          "oklch(26% 0.0512 257.90)",
+          "oklch(38% 0.0512 257.90)",
+          "oklch(49% 0.0512 257.90)",
+          "oklch(61% 0.0512 257.90)",
+          "oklch(72% 0.0512 257.90)",
+          "oklch(84% 0.0512 257.90)",
+          "oklch(95% 0.0512 257.90)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "灰蓝说明",
+        "tonalRamp": [
+          "oklch(15% 0.0410 257.42)",
+          "oklch(26% 0.0410 257.42)",
+          "oklch(38% 0.0410 257.42)",
+          "oklch(49% 0.0410 257.42)",
+          "oklch(61% 0.0410 257.42)",
+          "oklch(72% 0.0410 257.42)",
+          "oklch(84% 0.0410 257.42)",
+          "oklch(95% 0.0410 257.42)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "冷灰分隔",
+        "tonalRamp": [
+          "oklch(15% 0.0126 255.51)",
+          "oklch(26% 0.0126 255.51)",
+          "oklch(38% 0.0126 255.51)",
+          "oklch(49% 0.0126 255.51)",
+          "oklch(61% 0.0126 255.51)",
+          "oklch(72% 0.0126 255.51)",
+          "oklch(84% 0.0126 255.51)",
+          "oklch(95% 0.0126 255.51)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "primary": {
+        "role": "primary",
+        "displayName": "钴蓝",
+        "tonalRamp": [
+          "oklch(15% 0.1752 265.64)",
+          "oklch(26% 0.1752 265.64)",
+          "oklch(38% 0.1752 265.64)",
+          "oklch(49% 0.1752 265.64)",
+          "oklch(61% 0.1752 265.64)",
+          "oklch(72% 0.1752 265.64)",
+          "oklch(84% 0.1752 265.64)",
+          "oklch(95% 0.1752 265.64)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "primary-soft": {
+        "role": "primary",
+        "displayName": "浅钴蓝纸面",
+        "tonalRamp": [
+          "oklch(15% 0.0179 272.31)",
+          "oklch(26% 0.0179 272.31)",
+          "oklch(38% 0.0179 272.31)",
+          "oklch(49% 0.0179 272.31)",
+          "oklch(61% 0.0179 272.31)",
+          "oklch(72% 0.0179 272.31)",
+          "oklch(84% 0.0179 272.31)",
+          "oklch(95% 0.0179 272.31)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "teal": {
+        "role": "secondary",
+        "displayName": "核验青绿",
+        "tonalRamp": [
+          "oklch(15% 0.0737 182.62)",
+          "oklch(26% 0.0737 182.62)",
+          "oklch(38% 0.0737 182.62)",
+          "oklch(49% 0.0737 182.62)",
+          "oklch(61% 0.0737 182.62)",
+          "oklch(72% 0.0737 182.62)",
+          "oklch(84% 0.0737 182.62)",
+          "oklch(95% 0.0737 182.62)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "teal-soft": {
+        "role": "secondary",
+        "displayName": "浅青绿纸面",
+        "tonalRamp": [
+          "oklch(15% 0.0118 170.27)",
+          "oklch(26% 0.0118 170.27)",
+          "oklch(38% 0.0118 170.27)",
+          "oklch(49% 0.0118 170.27)",
+          "oklch(61% 0.0118 170.27)",
+          "oklch(72% 0.0118 170.27)",
+          "oklch(84% 0.0118 170.27)",
+          "oklch(95% 0.0118 170.27)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "amber": {
+        "role": "secondary",
+        "displayName": "待确认赭色",
+        "tonalRamp": [
+          "oklch(15% 0.0969 67.88)",
+          "oklch(26% 0.0969 67.88)",
+          "oklch(38% 0.0969 67.88)",
+          "oklch(49% 0.0969 67.88)",
+          "oklch(61% 0.0969 67.88)",
+          "oklch(72% 0.0969 67.88)",
+          "oklch(84% 0.0969 67.88)",
+          "oklch(95% 0.0969 67.88)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "amber-soft": {
+        "role": "secondary",
+        "displayName": "浅赭纸面",
+        "tonalRamp": [
+          "oklch(15% 0.0253 78.92)",
+          "oklch(26% 0.0253 78.92)",
+          "oklch(38% 0.0253 78.92)",
+          "oklch(49% 0.0253 78.92)",
+          "oklch(61% 0.0253 78.92)",
+          "oklch(72% 0.0253 78.92)",
+          "oklch(84% 0.0253 78.92)",
+          "oklch(95% 0.0253 78.92)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "red": {
+        "role": "tertiary",
+        "displayName": "错误暗红",
+        "tonalRamp": [
+          "oklch(15% 0.1413 19.04)",
+          "oklch(26% 0.1413 19.04)",
+          "oklch(38% 0.1413 19.04)",
+          "oklch(49% 0.1413 19.04)",
+          "oklch(61% 0.1413 19.04)",
+          "oklch(72% 0.1413 19.04)",
+          "oklch(84% 0.1413 19.04)",
+          "oklch(95% 0.1413 19.04)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "red-soft": {
+        "role": "tertiary",
+        "displayName": "浅红纸面",
+        "tonalRamp": [
+          "oklch(15% 0.0163 12.78)",
+          "oklch(26% 0.0163 12.78)",
+          "oklch(38% 0.0163 12.78)",
+          "oklch(49% 0.0163 12.78)",
+          "oklch(61% 0.0163 12.78)",
+          "oklch(72% 0.0163 12.78)",
+          "oklch(84% 0.0163 12.78)",
+          "oklch(95% 0.0163 12.78)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "focus": {
+        "role": "primary",
+        "displayName": "浅蓝焦点",
+        "tonalRamp": [
+          "oklch(15% 0.1263 270.22)",
+          "oklch(26% 0.1263 270.22)",
+          "oklch(38% 0.1263 270.22)",
+          "oklch(49% 0.1263 270.22)",
+          "oklch(61% 0.1263 270.22)",
+          "oklch(72% 0.1263 270.22)",
+          "oklch(84% 0.1263 270.22)",
+          "oklch(95% 0.1263 270.22)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "深钴蓝",
+        "tonalRamp": [
+          "oklch(15% 0.1689 265.46)",
+          "oklch(26% 0.1689 265.46)",
+          "oklch(38% 0.1689 265.46)",
+          "oklch(49% 0.1689 265.46)",
+          "oklch(61% 0.1689 265.46)",
+          "oklch(72% 0.1689 265.46)",
+          "oklch(84% 0.1689 265.46)",
+          "oklch(95% 0.1689 265.46)"
+        ],
+        "rampNote": "Synthesized for the panel only; source UI uses the DESIGN.md color primitive."
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "页标题",
+        "purpose": "操作页面标题；随断点变化。"
+      },
+      "title": {
+        "displayName": "面板标题",
+        "purpose": "区分内容容器。"
+      },
+      "body": {
+        "displayName": "正文基础",
+        "purpose": "根字号；具体说明多用11–12px。"
+      },
+      "label": {
+        "displayName": "操作标签",
+        "purpose": "按钮、字段标签。"
+      },
+      "mono": {
+        "displayName": "摘要等宽",
+        "purpose": "哈希与审计摘要。"
+      }
+    },
+    "shadows": [
+      {
+        "name": "overlay",
+        "value": "0 14px 46px #1c2d4612",
+        "purpose": "toast与手机侧栏"
+      },
+      {
+        "name": "drawer",
+        "value": "-12px 0 48px #15243c1c",
+        "purpose": "右侧抽屉"
+      },
+      {
+        "name": "stage-current",
+        "value": "0 0 0 3px #e6edfc",
+        "purpose": "当前阶段光圈"
+      }
+    ],
+    "motion": [
+      {
+        "name": "mobile-sidebar",
+        "value": "transform .18s",
+        "purpose": "手机导航位移"
+      },
+      {
+        "name": "progress",
+        "value": "transform .3s",
+        "purpose": "进度条声明；演示数值每700ms增加25%"
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition:none!important;scroll-behavior:auto!important",
+        "purpose": "prefers-reduced-motion:reduce"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide-min",
+        "value": "1500px"
+      },
+      {
+        "name": "desktop-max",
+        "value": "1150px"
+      },
+      {
+        "name": "tablet-max",
+        "value": "920px"
+      },
+      {
+        "name": "mobile-max",
+        "value": "680px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "主按钮",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "钴蓝主操作；文字显示具体动作。",
+      "html": "<button class=\"ds-primary\">开始演示训练</button>",
+      "css": ".ds-primary{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:37px;padding:8px 14px;border-radius:7px;font:600 12px/1.6 'Segoe UI','Microsoft YaHei UI','PingFang SC',sans-serif;cursor:pointer;background:var(--primary,#365dca);color:var(--surface,#fff);border:1px solid var(--primary,#365dca)}.ds-primary:hover{background:#294db4}.ds-primary:focus-visible{outline:3px solid #90aaff;outline-offset:3px}.ds-primary:disabled{opacity:.5;cursor:not-allowed}"
+    },
+    {
+      "name": "次按钮",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "只读查看或取消等次操作。",
+      "html": "<button class=\"ds-secondary\">查看实验记录</button>",
+      "css": ".ds-secondary{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:37px;padding:8px 14px;border-radius:7px;font:600 12px/1.6 'Segoe UI','Microsoft YaHei UI','PingFang SC',sans-serif;cursor:pointer;background:var(--surface,#fff);color:var(--ink,#1c2d46);border:1px solid #d6deea}.ds-secondary:hover{background:#f7f9fc}.ds-secondary:focus-visible{outline:3px solid #90aaff;outline-offset:3px}"
+    },
+    {
+      "name": "期号输入",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "有标签的期号字段；红字承载错误，焦点用外轮廓。",
+      "html": "<label class=\"ds-field\">训练截止期<input value=\"26123\" aria-describedby=\"ds-hint\"><small id=\"ds-hint\">必须早于目标期</small></label>",
+      "css": ".ds-field{display:grid;gap:7px;font:600 12px/1.6 'Segoe UI','Microsoft YaHei UI',sans-serif;color:var(--ink,#1c2d46)}.ds-field input{height:39px;border:1px solid #ced7e4;border-radius:6px;background:var(--surface,#fff);color:var(--ink,#1c2d46);padding:7px 10px;font:400 14px/1.6 'Segoe UI','Microsoft YaHei UI',sans-serif;min-width:0}.ds-field small{font-size:11px;font-weight:400;color:var(--muted,#607087)}.ds-field input:focus-visible{outline:3px solid #90aaff;outline-offset:3px}"
+    },
+    {
+      "name": "活动导航",
+      "kind": "nav",
+      "refersTo": "nav-active",
+      "description": "图标与文字共同表达入口；活动项浅蓝底。",
+      "html": "<nav><a class=\"ds-nav\" href=\"#overview\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/></svg>研究概览</a></nav>",
+      "css": ".ds-nav{display:flex;gap:12px;align-items:center;padding:11px 13px;border-radius:8px;background:var(--primary-soft,#eef2ff);color:var(--primary,#365dca);text-decoration:none;font:650 13px/1.6 'Segoe UI','Microsoft YaHei UI',sans-serif}.ds-nav svg{width:19px;height:19px;flex-shrink:0}.ds-nav:hover{background:var(--primary-soft,#eef2ff)}.ds-nav:focus-visible{outline:3px solid #90aaff;outline-offset:3px}"
+    },
+    {
+      "name": "状态标签",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "只读状态标签，用文字解释颜色。",
+      "html": "<div class=\"ds-tags\"><span class=\"ds-tag ds-green\">真实快照</span><span class=\"ds-tag ds-amber\">未证实</span><span class=\"ds-tag ds-blue\">演示任务</span></div>",
+      "css": ".ds-tags{display:flex;gap:7px;flex-wrap:wrap}.ds-tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;white-space:nowrap;font:11px/1.65 'Segoe UI','Microsoft YaHei UI',sans-serif}.ds-green{color:var(--teal,#246e64);background:var(--teal-soft,#eaf4f0)}.ds-amber{color:var(--amber,#8a5a1e);background:var(--amber-soft,#fff4e3)}.ds-blue{color:var(--primary,#365dca);background:var(--primary-soft,#eef2ff)}"
+    },
+    {
+      "name": "工作面板",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "平放白色面板，用分隔线建立标题与内容层级。",
+      "html": "<section class=\"ds-panel\"><header class=\"ds-head\">研究基础</header><div class=\"ds-body\">训练模型：尚未实际训练</div></section>",
+      "css": ".ds-panel{background:var(--surface,#fff);border:1px solid var(--line,#e1e7ef);border-radius:var(--radius,12px);color:var(--ink,#1c2d46);font:12px/1.6 'Segoe UI','Microsoft YaHei UI',sans-serif}.ds-head{padding:20px 22px;border-bottom:1px solid var(--line,#e1e7ef);font-size:17px;font-weight:650}.ds-body{padding:22px;color:var(--muted,#607087)}"
+    },
+    {
+      "name": "研究阶段线",
+      "kind": "custom",
+      "description": "四阶段的流程位置，当前项带光圈，每阶段都有文字。",
+      "html": "<div class=\"ds-stages\"><div class=\"ds-stage ds-done\">固定方法</div><div class=\"ds-stage ds-done\">留存组合</div><div class=\"ds-stage ds-current\">等待开奖</div><div class=\"ds-stage\">评估证据</div></div>",
+      "css": ".ds-stages{display:grid;grid-template-columns:repeat(4,1fr);font:11px/1.6 'Segoe UI','Microsoft YaHei UI',sans-serif;color:var(--muted,#607087)}.ds-stage{position:relative;padding-top:27px}.ds-stage:before{content:'';position:absolute;top:8px;left:0;right:0;height:2px;background:#e4eaf3}.ds-stage:after{content:'';position:absolute;top:4px;left:0;width:10px;height:10px;border:2px solid white;border-radius:50%;background:#d4ddea}.ds-stage:last-child:before{display:none}.ds-done:before{background:#a8c9c3}.ds-done:after{background:var(--teal,#246e64)}.ds-current:after{background:var(--primary,#365dca);box-shadow:0 0 0 3px #e6edfc}"
+    }
+  ],
+  "narrative": {
+    "northStar": "研究工作台",
+    "overview": "本文件按已实现的静态 HTML/CSS/JavaScript 扫描记录，依据为 `prototype/styles.css`、`prototype/index.html` 的合同、`prototype/app.js` 及桌面与手机概览截图。它描述当前原型的视觉事实，不代表生产框架或真实训练能力已经落地。名称是对既有工作台方向的描述，不新增品牌承诺。\n\n整体是浅灰蓝工作面、白色台账和深蓝文字的轻量操作环境。主操作集中用钴蓝，核验状态用青绿，待确认用赭色，错误用暗红。信息密度适合个人重复查看；边框、间距、标题和状态文字共同建立层级。",
+    "keyCharacteristics": [
+      "浅色固定导航与白色工作容器，细分隔线组织内容。",
+      "中文系统字体、紧凑说明文字、对齐的数字及可换行的摘要哈希。",
+      "状态保留文字标签；真实快照、历史探索与交互演示可辨认。",
+      "深度主要由平面色块与边框表达，遮罩和抽屉才使用明显投影。"
+    ],
+    "rules": [
+      {
+        "name": "The 状态可读 Rule",
+        "body": "当前实现同时提供状态文字与色彩；新增状态也要保留可读文字，不能只靠圆点或颜色表达。",
+        "section": "colors"
+      },
+      {
+        "name": "The 平放面板 Rule",
+        "body": "面板默认依靠边框和色差；不要给现有普通内容容器增加悬浮阴影来替代其层级。",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** 沿用前置 token 与现有系统字体栈，使用文字解释每种研究状态。",
+      "**Do** 为真实快照、历史探索和演示操作保留清楚的标签及时间边界。",
+      "**Do** 让比较表格的数字右对齐，并在窄屏通过横向滚动保留列结构。",
+      "**Do** 对新操作延续可见焦点、表单标签与明确错误文字。"
+    ],
+    "donts": [
+      "**Don't** 把演示完成、已核验或绿色状态表达为已经证明盈利或优于随机。",
+      "**Don't** 用虚构收益曲线填充尚无结算结果的空状态。",
+      "**Don't** 将状态标签一律处理为可点击筛选器，或为普通面板添加额外浮动阴影。",
+      "**Don't** 把当前概览的研究日历构图、静态数据日期或原型框架推广为全局品牌约束。"
+    ]
+  }
+}

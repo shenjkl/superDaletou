@@ -1,0 +1,5 @@
+{
+  "superseded_by": "v2",
+  "reason": "Add explicit official sale-end and schedule-change eligibility guards; v1 pending packet is archived and excluded from active research.",
+  "active_results_path": "v2"
+}

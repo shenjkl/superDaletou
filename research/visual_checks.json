@@ -1,0 +1,30 @@
+[
+  {
+    "width": 320,
+    "dark": false,
+    "overflow": false,
+    "bars": 10,
+    "root": true
+  },
+  {
+    "width": 320,
+    "dark": true,
+    "overflow": false,
+    "bars": 10,
+    "root": true
+  },
+  {
+    "width": 736,
+    "dark": false,
+    "overflow": false,
+    "bars": 10,
+    "root": true
+  },
+  {
+    "width": 736,
+    "dark": true,
+    "overflow": false,
+    "bars": 10,
+    "root": true
+  }
+]
