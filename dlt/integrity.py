@@ -647,6 +647,7 @@ UNIQUE_COLUMNS = {
 # Exact contracts for immutable UPDATE/DELETE trigger pairs.
 IMMUTABLE_TRIGGERS = {
     'source_quarantine': ('source_quarantine', 'immutable source quarantine'),
+    'task_cancellations': ('task_cancellations', 'immutable task cancellation'),
     'backtest_reports': ('backtest_reports', 'immutable backtest report'),
     'bundled_snapshot_import_fences': ('bundled_snapshot_import_fences', 'immutable bundled snapshot import fence'),
     'bundled_snapshot_import_retries': ('bundled_snapshot_import_retries', 'immutable bundled snapshot import retry'),

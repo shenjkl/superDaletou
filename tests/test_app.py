@@ -2,6 +2,7 @@ import http.client
 import base64
 from contextlib import closing
 from datetime import datetime, timedelta, timezone
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
@@ -9,6 +10,7 @@ import tempfile
 import threading
 import time
 import unittest
+import uuid
 from unittest.mock import patch
 
 from dlt.app import LocalServer, SingleInstance
@@ -49,6 +51,21 @@ class AppTests(unittest.TestCase):
             conn.close()
 
     def write(self, path, value, headers=None):
+        value = dict(value)
+        if path == '/api/snapshots/import-bundled' and 'request_key' not in value:
+            value['request_key'] = str(uuid.uuid4())
+        if path == '/api/holdout-reservations' and value.get('confirmed') is True:
+            value.setdefault('request_key', str(uuid.uuid4()))
+        if path == '/api/source-reviews':
+            from dlt.app import _source_write_digest
+            document = base64.b64decode(value['document_base64'], validate=True)
+            request = {'kind': value['kind'], 'source_url': value['source_url'],
+                       'document_sha256': hashlib.sha256(document).hexdigest(),
+                       'document_size': len(document), 'document_name': value.get('document_name'),
+                       'extracted': value['extracted'], 'reviewer_note': value['reviewer_note'],
+                       'confirmed': value['confirmed']}
+            value.update(request)
+            value.update(request_key=str(uuid.uuid4()), request_sha256=_source_write_digest(request))
         base = {'Cookie': self.cookie, 'Origin': self.server.origin, 'X-DLT-CSRF': self.csrf,
                 'Content-Type': 'application/json'}
         base.update(headers or {})
@@ -171,10 +188,14 @@ class AppTests(unittest.TestCase):
     def test_training_excluded_period_rejected_and_recorded_over_http(self):
         from test_backtest import source_data
         from test_model_repository import config
+        from dlt.models import ALGORITHM_VERSION, FEATURE_SCHEMA_VERSION, PREPROCESSING_VERSION
         snapshot = SnapshotStore(self.path).import_official(json.dumps(source_data()).encode(), 'fixture',
                     '2026-02-01T12:00:00+08:00')['snapshot_id']
         cfg = {**config(snapshot), 'train_end': '26014', 'cutoff': '26019',
-               'holdout_start': '26018', 'holdout_end': '26020'}
+               'holdout_start': '26018', 'holdout_end': '26020',
+               'algorithm_version': ALGORITHM_VERSION['tree'],
+               'feature_schema_version': FEATURE_SCHEMA_VERSION,
+               'preprocessing_version': PREPROCESSING_VERSION['tree']}
         body = {'request_key': 'boundary-http', 'name': '训练', 'config': cfg,
                 'first_issue': '26001', 'timeout': 20}
         status, _, payload = self.write('/api/jobs', body)
@@ -229,20 +250,20 @@ class AppTests(unittest.TestCase):
                   'timezone_offset_minutes': 480, 'page_size': 20, 'timeout_seconds': 20,
                   'max_bytes': 1048576, 'retry_count': 2, 'retry_wait_seconds': 30}
         self.assertEqual(self.write('/api/update-plans', {'config': config}, {'X-DLT-CSRF': 'bad'})[0], 403)
-        status, _, payload = self.write('/api/update-plans', {'config': config})
+        status, _, payload = self.write('/api/update-plans', {'request_key': str(uuid.uuid4()), 'config': config})
         self.assertEqual(status, 200)
         plan = json.loads(payload); self.assertFalse(plan['enabled'])
         status, _, payload = self.request('GET', '/api/update-plans', headers={'Cookie': self.cookie})
         self.assertEqual(status, 200)
         self.assertFalse(json.loads(payload)['plans'][0]['enabled'])
-        self.assertEqual(self.write('/api/update-plans/set-enabled', {'plan_id': plan['id'], 'enabled': 'yes'})[0], 400)
-        self.assertEqual(self.write('/api/update-plans/set-enabled', {'plan_id': plan['id'], 'enabled': True})[0], 200)
+        self.assertEqual(self.write('/api/update-plans/set-enabled', {'request_key': str(uuid.uuid4()), 'plan_id': plan['id'], 'enabled': 'yes'})[0], 400)
+        self.assertEqual(self.write('/api/update-plans/set-enabled', {'request_key': str(uuid.uuid4()), 'plan_id': plan['id'], 'enabled': True})[0], 200)
         _, _, payload = self.request('GET', '/api/update-plans', headers={'Cookie': self.cookie})
         self.assertTrue(json.loads(payload)['plans'][0]['enabled'])
         self.assertEqual(json.loads(payload)['plans'][0]['runs'], [])
-        self.assertEqual(self.write('/api/update-plans/set-enabled', {'plan_id': plan['id'], 'enabled': False})[0], 200)
-        self.assertEqual(self.write('/api/update-plans/run-now', {'plan_id': plan['id']}, {'X-DLT-CSRF': 'bad'})[0], 403)
-        status, _, payload = self.write('/api/update-plans/run-now', {'plan_id': plan['id']})
+        self.assertEqual(self.write('/api/update-plans/set-enabled', {'request_key': str(uuid.uuid4()), 'plan_id': plan['id'], 'enabled': False})[0], 200)
+        self.assertEqual(self.write('/api/update-plans/run-now', {'request_key': str(uuid.uuid4()), 'plan_id': plan['id']}, {'X-DLT-CSRF': 'bad'})[0], 403)
+        status, _, payload = self.write('/api/update-plans/run-now', {'request_key': str(uuid.uuid4()), 'plan_id': plan['id']})
         self.assertEqual(status, 200)
         one_off = json.loads(payload)
         self.assertEqual(one_off['status'], 'queued')
@@ -290,6 +311,8 @@ class AppTests(unittest.TestCase):
     def test_personally_reviewed_experiment_registration_over_http(self):
         from test_candidates import config, input_rows
         from test_settlement import fixture
+        from dlt.prize_rules import (DLT_2026_HIT_GROUPS, DLT_2026_OFFICIAL_SORT_CODES,
+                                     DLT_2026_ADDITIONAL_GROUPS)
         china = timezone(timedelta(hours=8))
         now = datetime.now(timezone.utc)
         day = (now.astimezone(china) + timedelta(days=2)).date()
@@ -307,7 +330,11 @@ class AppTests(unittest.TestCase):
         PairRepository(self.path).save_draft('one', cfg, history_first_issue='26001', history_cutoff_issue='26016')
         url = 'https://www.sporttery.cn/synthetic-test'
         rule = fixture()['rule']; rule.update(version=cfg['rule_version'], applicable_issues=['26017'], source=url)
-        rule['payout_sort_map'] = {'first': '101', 'first-extra': '201', 'second': '301', 'second-extra': '401'}
+        rule['payout_sort_map'] = {code: code for code in sorted(DLT_2026_OFFICIAL_SORT_CODES)}
+        rule['hit_groups'] = {outcome: (str(rank) if rank is not None else None)
+                              for outcome, rank in DLT_2026_HIT_GROUPS.items()}
+        rule['additional_groups'] = {str(base): str(extra)
+                                     for base, extra in DLT_2026_ADDITIONAL_GROUPS.items()}
         extracts = {'calendar': {'issue': '26017', 'draw_date': day.isoformat(), 'cutoff_at': deadline.isoformat(),
                                  'version': cfg['calendar_version']}, 'rule': rule,
                     'tax': {'tax': rule['tax'], 'applicable_issues': ['26017']}}
@@ -354,7 +381,11 @@ class AppTests(unittest.TestCase):
         entry = json.loads(result)['experiment']
         self.assertEqual(entry['paper_result']['status'], 'waiting')
         self.assertIn('not independently', entry['content']['time_evidence'])
-        self.assertEqual(self.write('/api/experiments/close', {'request_key': 'http-exp', 'reason': 'test'})[0], 200)
+        from dlt.prospective_closure_writes import digest as closure_digest
+        close_request = {'object_key': 'http-exp', 'reason': 'test'}
+        self.assertEqual(self.write('/api/experiments/close', {
+            'request_key': str(uuid.uuid4()), **close_request,
+            'request_sha256': closure_digest('experiment_close', close_request)})[0], 200)
         _, _, result = self.request('GET', '/api/experiments', headers={'Cookie': self.cookie})
         self.assertEqual(json.loads(result)['experiments'][0]['status'], 'closed')
 
@@ -367,6 +398,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.write('/api/experiments', {**pending, 'require_intent': True})[0], 400)
 
     def test_real_train_over_local_http(self):
+        from dlt.models import ALGORITHM_VERSION, FEATURE_SCHEMA_VERSION, PREPROCESSING_VERSION
         status, _, payload = self.write('/api/snapshots/import-bundled', {})
         self.assertEqual(status, 200, payload)
         snapshot = json.loads(payload)['snapshot_id']
@@ -375,6 +407,9 @@ class AppTests(unittest.TestCase):
         body = {'request_key': 'job-one', 'name': '真实树模型', 'first_issue': rows[0], 'timeout': 30,
                 'config': {'snapshot_id': snapshot, 'method': 'tree', 'window': 5, 'seed': 123,
                            'train_end': rows[-11], 'cutoff': rows[-1], 'availability_mode': 'historical_reconstruction',
+                           'algorithm_version': ALGORITHM_VERSION['tree'],
+                           'feature_schema_version': FEATURE_SCHEMA_VERSION,
+                           'preprocessing_version': PREPROCESSING_VERSION['tree'],
                            'parameters': {'max_depth': 2, 'min_leaf': 2}}}
         status, _, payload = self.write('/api/jobs', body)
         self.assertEqual(status, 200, payload)
@@ -388,6 +423,9 @@ class AppTests(unittest.TestCase):
         self.assertTrue(job['artifact_id'])
         self.assertEqual(job['artifact_status'], 'ready')
         pair_request = {'request_key': 'model-pair', 'history_first_issue': rows[0], 'history_cutoff_issue': rows[-1],
+                        'model_selection': {'version': 'model-selection-v1', 'considered_attempts': ['job-one'],
+                                            'selected_attempt': 'job-one', 'reason': 'synthetic HTTP test selection',
+                                            'trial_group_id': None},
                         'artifact_id': job['artifact_id'], 'config': {'method': 'tree', 'structure': 'singles',
                         'target_issue': '26124', 'target_date': '2026-10-31', 'snapshot_id': snapshot,
                         'rule_version': 'manual-price', 'calendar_version': 'manual-date', 'budget_fen': 3600,
