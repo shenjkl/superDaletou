@@ -10,7 +10,7 @@ import unittest
 from dlt.candidates import _canonical
 from dlt.custom_scenarios import custom_scenario, PAYOUT_KEYS
 from dlt.integrity import check_database
-from dlt.recovery import RecoveryError, prepare_isolated_copy
+from dlt.recovery import RecoveryError, prepare_isolated_copy, protect_private_directory
 import test_scenarios as fixtures
 
 
@@ -19,12 +19,14 @@ class EvaluationIntegrityTests(unittest.TestCase):
 
     def setUp(self):
         fixtures.ScenarioTests.setUp(self)
+        protect_private_directory(self.db.parent)
         self.evaluations.run('historical', 'pair', **self.args)
         custom = custom_scenario(self.pair, {'label': '用户假设', 'payouts': {key: '10' for key in PAYOUT_KEYS}, 'provenance': {'kind': 'synthetic'}})
         self.evaluations.run('custom', 'pair', **{**self.args, 'scenario': custom})
         workspace = Path(__file__).resolve().parents[1]
         self.directory = tempfile.TemporaryDirectory(dir=workspace)
         self.addCleanup(self.directory.cleanup)
+        protect_private_directory(self.directory.name)
         self.target = Path(self.directory.name) / 'candidate.sqlite3'
 
     def mutate(self, key, change):
