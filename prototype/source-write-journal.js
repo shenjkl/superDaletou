@@ -2,6 +2,7 @@
   'use strict';const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,sha=/^[0-9a-f]{64}$/;
   function copy(x){return JSON.parse(JSON.stringify(x));}function stable(x){if(Array.isArray(x))return x.map(stable);if(x&&typeof x==='object')return Object.fromEntries(Object.keys(x).sort().map(k=>[k,stable(x[k])]));return x;}
   const canonical=x=>JSON.stringify(stable(x));
+  async function digest(value,cryptoApi=globalThis.crypto){if(!cryptoApi?.subtle||typeof TextEncoder!=='function')throw new Error('本机摘要能力不可用，未发送请求');const bytes=new TextEncoder().encode(canonical(value));return [...new Uint8Array(await cryptoApi.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');}
   function browserStore(idb){if(!idb)throw new Error('本机来源写入暂存不可用，未发送请求');let opening;
     function open(){if(!opening)opening=new Promise((resolve,reject)=>{let abandoned=false;const r=idb.open('dlt-source-write-journal',1);r.onupgradeneeded=()=>r.result.createObjectStore('writes',{keyPath:'request_key'});r.onsuccess=()=>{if(abandoned){r.result.close();return;}r.result.onversionchange=()=>{r.result.close();opening=null;};resolve(r.result);};r.onerror=()=>{opening=null;reject(r.error||new Error('来源写入暂存打开失败'));};r.onblocked=()=>{abandoned=true;opening=null;reject(new Error('来源写入暂存被其他页面阻塞'));};});return opening;}
     async function tx(mode,work){const db=await open();return new Promise((resolve,reject)=>{const t=mode==='readwrite'?db.transaction('writes',mode,{durability:'strict'}):db.transaction('writes',mode);let out;t.oncomplete=()=>resolve(out);t.onerror=t.onabort=()=>reject(t.error||new Error('来源写入暂存失败'));if(mode==='readwrite'&&t.durability!=='strict'){t.abort();reject(new Error('浏览器不支持可靠持久写入，未发送请求'));return;}try{work(t.objectStore('writes'),v=>out=v);}catch(e){t.abort();reject(e);}});}
@@ -22,5 +23,5 @@
       async dismiss(key){const x=valid(await store.get(key));if(!x||(await state(x)).status!=='accepted')throw new Error('来源写入未核实成功，不能清理本机副本');await store.remove(key);return x;}
     };
   }
-  return {browserStore,coordinator,canonical};
+  return {browserStore,coordinator,canonical,digest};
 });
