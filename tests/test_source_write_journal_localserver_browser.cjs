@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
+const net = require('node:net');
 const path = require('node:path');
 const test = require('node:test');
 
@@ -14,7 +15,7 @@ const browser = [
 const python = process.env.DLT_PYTHON || path.join(repository, '.venv', 'Scripts', 'python.exe');
 const tempRoot = process.env.DLT_BROWSER_TEST_ROOT;
 
-test('real Chrome restores a lost source-review response against LocalServer after reload', {
+test('real Chrome restores a lost source-review response after LocalServer process restart', {
   skip: !browser || !tempRoot || !fs.existsSync(python),
   timeout: 90000,
 }, async () => {
@@ -29,29 +30,55 @@ test('real Chrome restores a lost source-review response against LocalServer aft
   let socket;
   let serverOutput = '';
   try {
-    serverProcess = spawn(python, [path.join(__dirname, 'browser_local_server.py'), dataDirectory], {
-      cwd: repository,
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, PYTHONPATH: `${repository};${path.join(repository, 'tests')}` },
-    });
-    serverProcess.stdout.setEncoding('utf8');
-    serverProcess.stderr.setEncoding('utf8');
-    serverProcess.stderr.on('data', chunk => { serverOutput += chunk; });
     const port = await new Promise((resolve, reject) => {
-      let stdout = '';
-      const timer = setTimeout(() => reject(new Error(`LocalServer startup timed out: ${serverOutput}`)), 30000);
-      serverProcess.once('error', error => { clearTimeout(timer); reject(error); });
-      serverProcess.stdout.on('data', chunk => {
-        stdout += chunk;
-        const line = stdout.split(/\r?\n/)[0];
-        if (/^\d+$/.test(line)) { clearTimeout(timer); resolve(Number(line)); }
-        else if (serverProcess.exitCode !== null) { clearTimeout(timer); reject(new Error(`LocalServer exited: ${serverOutput}`)); }
-      });
-      serverProcess.once('exit', code => {
-        if (code !== 0) { clearTimeout(timer); reject(new Error(`LocalServer exited with ${code}: ${serverOutput}`)); }
+      const probe = net.createServer();
+      probe.once('error', reject);
+      probe.listen(0, '127.0.0.1', () => {
+        const { port: available } = probe.address();
+        probe.close(error => error ? reject(error) : resolve(available));
       });
     });
+    const startServer = () => {
+      serverOutput = '';
+      serverProcess = spawn(python, [path.join(__dirname, 'browser_local_server.py'), dataDirectory, String(port)], {
+        cwd: repository,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, PYTHONPATH: `${repository};${path.join(repository, 'tests')}` },
+      });
+      serverProcess.stdout.setEncoding('utf8');
+      serverProcess.stderr.setEncoding('utf8');
+      serverProcess.stderr.on('data', chunk => { serverOutput += chunk; });
+      return new Promise((resolve, reject) => {
+        let stdout = '';
+        const proc = serverProcess;
+        const timer = setTimeout(() => reject(new Error(`LocalServer startup timed out: ${serverOutput}`)), 30000);
+        proc.once('error', error => { clearTimeout(timer); reject(error); });
+        proc.stdout.on('data', chunk => {
+          stdout += chunk;
+          const line = stdout.split(/\r?\n/)[0];
+          if (line === String(port)) { clearTimeout(timer); resolve(proc); }
+          else if (proc.exitCode !== null) { clearTimeout(timer); reject(new Error(`LocalServer exited: ${serverOutput}`)); }
+        });
+        proc.once('exit', code => {
+          if (code !== 0) { clearTimeout(timer); reject(new Error(`LocalServer exited with ${code}: ${serverOutput}`)); }
+        });
+      });
+    };
+    const stopServer = async proc => {
+      if (!proc || proc.exitCode !== null) return;
+      proc.kill();
+      await new Promise(resolve => {
+        let timer;
+        const done = () => { clearTimeout(timer); resolve(); };
+        timer = setTimeout(done, 5000);
+        proc.once('exit', done);
+        if (proc.exitCode !== null) done();
+      });
+      assert.ok(proc.exitCode !== null || proc.signalCode !== null,
+        `LocalServer process did not stop before restart (pid=${proc.pid}, killed=${proc.killed})`);
+    };
+    await startServer();
     const origin = `http://127.0.0.1:${port}`;
 
     chromeProcess = spawn(browser, ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
@@ -173,6 +200,10 @@ test('real Chrome restores a lost source-review response against LocalServer aft
     const { createHash } = require('node:crypto');
     const documentSha256 = createHash('sha256').update(documentBytes).digest('hex');
 
+    const firstServerPid = serverProcess.pid;
+    await stopServer(serverProcess);
+    await startServer();
+    assert.notEqual(serverProcess.pid, firstServerPid, 'LocalServer did not restart as a new OS process');
     await send('Page.reload', { ignoreCache: true });
     await waitForPage();
     await evaluate(`document.querySelector('#navigation a[href="#prospective"]')?.click()`);

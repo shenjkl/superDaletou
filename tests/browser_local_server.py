@@ -9,7 +9,8 @@ from dlt.recovery import protect_private_directory
 data_directory = Path(sys.argv[1]).resolve()
 data_directory.mkdir(parents=True, exist_ok=True)
 protect_private_directory(data_directory)
-server = LocalServer(0, data_directory / 'browser-test.sqlite3')
+port = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+server = LocalServer(port, data_directory / 'browser-test.sqlite3')
 print(server.server_port, flush=True)
 try:
     server.serve_forever()
