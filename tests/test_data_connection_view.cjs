@@ -17,11 +17,24 @@ function setup(){
   const ctx={backend:{ready:true,csrf:'csrf',snapshots:[],jobs:[],plans:[],worker:null,autostart:null},
     state:{page:'data'},document:{body:{dataset:{}},getElementById:id=>nodes[id]||null,addEventListener(){}},el:id=>nodes[id]||null,
     updatePlanList:()=> '核验后的计划',updateWorkerStatus:()=> '核验后的后台状态',autostartControls:()=> '核验后的启动状态',refreshStaticDrawRows:async()=>{},
-    refreshSnapshotDetail:async()=>{},location:{protocol:'http:',hostname:'127.0.0.1'}};
+    refreshSnapshotDetail:async()=>{},refreshPaperWriteJournal:async()=>{},refreshBundledImportJournal:async()=>{},
+    refreshRecoveryWriteJournal:async()=>{},refreshUpdateWriteJournal:async()=>{},refreshTaskWriteJournal:async()=>{},
+    refreshDeclarationWriteJournal:async()=>{},refreshHoldoutWriteJournal:async()=>{},refreshFixedEvaluationWriteJournal:async()=>{},
+    refreshReservations:async()=>true,refreshLegacyOrigins:async()=>true,invalidateHoldoutAudit:()=>{},refreshProspectiveClosureWriteJournal:()=>{},
+    location:{protocol:'http:',hostname:'127.0.0.1'}};
   ctx.fetch=async url=>({ok:true,status:200,json:async()=>url==='/api/snapshots'?{snapshots:[]}:
-    url==='/api/jobs'?{jobs:[]}:{plans:[],worker:{state:'running'},autostart:{}}});
+    url==='/api/jobs'?{jobs:[]}:url==='/api/training-limits'?trainingLimits():url==='/api/source-quarantine'?{records:[]}:{plans:[],worker:{state:'running'},autostart:{}}});
   vm.runInNewContext(source.slice(start,end),ctx);
   return {ctx,notice,editor,nodes};
+}
+
+function trainingLimits(){return {schema:'training-limits-v1',limits:{timeout_seconds:[1,120],window_periods:[1,120],history_rows:[3,500],tree_max_depth:[0,5],tree_min_leaf:[1,100],lstm_hidden_size:[1,32],lstm_epochs:[1,10],lstm_learning_rate:[0.0001,1]},backtest:{max_targets:50,max_replicas:10,max_target_replica_pairs:100,min_history_periods:12,max_history_periods:200,max_tickets:100,max_sampling_attempts:20000,max_model_validation_periods:100,timeout_seconds:[1,120],budget_fen:[200,20000]},versions:{algorithm:{tree:'numpy-tree-v1',lstm:'numpy-lstm-v1'},feature_schema:'draw-window-onehot-47-v1',preprocessing:{tree:'window-mean-v1',lstm:'raw-sequence-v1'}}};}
+
+async function waitForRevalidation(promise,ctx){
+  let timer;
+  try{
+    await Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`revalidation did not reach the expected read: ${ctx.backend.error||'no backend error'}`)),2000);})]);
+  }finally{clearTimeout(timer);}
 }
 
 test('failed data refresh hides stale statuses and preserves an edited field',async()=>{
@@ -43,7 +56,7 @@ test('reconnection unmasks only after plans and snapshot details are checked',as
   const waiting=new Promise(resolve=>{release=resolve;});
   const reached=new Promise(resolve=>{entered=resolve;});
   ctx.refreshSnapshotDetail=async()=>{entered();await waiting;};
-  const pending=ctx.refreshBackend();await reached;
+  const pending=ctx.refreshBackend();await waitForRevalidation(reached,ctx);
   assert.equal(ctx.document.body.dataset.serverStatus,'unverified');
   assert.equal(notice.hidden,false);assert.equal(editor.value,'未提交的计划配置');
   release();await pending;
@@ -54,7 +67,7 @@ test('an older refresh cannot unmask after a newer disconnection',async()=>{
   const {ctx,notice}=setup();let release,entered;
   const waiting=new Promise(resolve=>{release=resolve;}),reached=new Promise(resolve=>{entered=resolve;});
   ctx.refreshSnapshotDetail=async()=>{entered();await waiting;};
-  const pending=ctx.refreshBackend();await reached;ctx.markConnectionUncertain('offline');
+  const pending=ctx.refreshBackend();await waitForRevalidation(reached,ctx);ctx.markConnectionUncertain('offline');
   release();await pending;
   assert.equal(ctx.document.body.dataset.serverStatus,'unverified');assert.equal(notice.hidden,false);
   assert.equal(ctx.backend.ready,false);
@@ -69,6 +82,16 @@ test('writes are blocked during revalidation and network errors mark the connect
   assert.equal(ctx.backend.ready,false);assert.equal(ctx.document.body.dataset.serverStatus,'unverified');
 });
 
+test('explicit business validation errors do not mark the service disconnected',async()=>{
+  const {ctx,notice,editor}=setup();ctx.markConnectionVerified(0,true);
+  ctx.fetch=async()=>({ok:false,status:400,json:async()=>({error:'字段格式无效，请修正后重试'})});
+  await assert.rejects(ctx.backendPost('/api/test',{value:'保留的编辑'}),/字段格式无效/);
+  assert.equal(ctx.backend.ready,true);
+  assert.equal(ctx.document.body.dataset.serverStatus,'verified');
+  assert.equal(notice.hidden,true);
+  assert.equal(editor.value,'未提交的计划配置');
+});
+
 test('a refresh that did not check the data page cannot clear its revalidation mask',()=>{
   const {ctx,notice}=setup();ctx.markConnectionChecking();
   ctx.markConnectionVerified(1,false);
@@ -80,12 +103,12 @@ test('a refresh that did not check the data page cannot clear its revalidation m
 test('backtest revalidates reports, reservations and origins before unmasking',async()=>{
   const {ctx,notice,editor}=setup();ctx.state.page='backtest';ctx.backend.backtests=[];
   ctx.invalidateHoldoutAudit=()=>{};ctx.markConnectionUncertain('offline');ctx.backend.ready=true;
-  ctx.fetch=async url=>({ok:true,status:200,json:async()=>url==='/api/snapshots'?{snapshots:[]}:{jobs:[]}});
+  ctx.fetch=async url=>({ok:true,status:200,json:async()=>url==='/api/snapshots'?{snapshots:[]}:url==='/api/training-limits'?trainingLimits():{jobs:[]}});
   let release,entered;const wait=new Promise(resolve=>{release=resolve;}),reached=new Promise(resolve=>{entered=resolve;});
   let reservationForced,originsForced;
   ctx.refreshReservations=async force=>{reservationForced=force;entered();await wait;return true;};
   ctx.refreshLegacyOrigins=async force=>{originsForced=force;return true;};
-  const pending=ctx.refreshBackend();await reached;
+  const pending=ctx.refreshBackend();await waitForRevalidation(reached,ctx);
   assert.equal(ctx.document.body.dataset.serverStatus,'unverified');assert.equal(notice.hidden,false);
   release();await pending;
   assert.equal(ctx.document.body.dataset.serverStatus,'verified');assert.equal(editor.value,'未提交的计划配置');
@@ -97,7 +120,7 @@ test('backtest revalidates reports, reservations and origins before unmasking',a
 test('failure to revalidate a reservation keeps backtest status hidden',async()=>{
   const {ctx,notice}=setup();ctx.state.page='backtest';ctx.backend.backtests=[];
   ctx.invalidateHoldoutAudit=()=>{};ctx.markConnectionUncertain('offline');ctx.backend.ready=true;
-  ctx.fetch=async url=>({ok:true,status:200,json:async()=>url==='/api/snapshots'?{snapshots:[]}:{jobs:[]}});
+  ctx.fetch=async url=>({ok:true,status:200,json:async()=>url==='/api/snapshots'?{snapshots:[]}:url==='/api/training-limits'?trainingLimits():{jobs:[]}});
   ctx.refreshReservations=async()=>false;ctx.refreshLegacyOrigins=async()=>true;
   await ctx.refreshBackend();
   assert.equal(ctx.backend.ready,false);assert.equal(ctx.document.body.dataset.serverStatus,'unverified');
@@ -110,10 +133,10 @@ test('evidence page stays unverified until all four inputs return',async()=>{
   ctx.markConnectionUncertain('offline');ctx.backend.ready=true;
   let release,entered;const wait=new Promise(resolve=>{release=resolve;}),reached=new Promise(resolve=>{entered=resolve;});
   ctx.fetch=async url=>{if(url==='/api/fixed-evaluations'){entered();await wait;}
-    return {ok:true,status:200,json:async()=>url==='/api/snapshots'?{snapshots:[]}:
+    return {ok:true,status:200,json:async()=>url==='/api/snapshots'?{snapshots:[]}:url==='/api/training-limits'?trainingLimits():
       url==='/api/experiments'?{experiments:[]}:url==='/api/experiment-series'?{series:[]}:
       url==='/api/fixed-evaluations'?{evaluations:[]}:{jobs:[]}};};
-  const pending=ctx.refreshBackend();await reached;
+  const pending=ctx.refreshBackend();await waitForRevalidation(reached,ctx);
   assert.equal(ctx.document.body.dataset.serverStatus,'unverified');assert.equal(notice.hidden,false);
   release();await pending;
   assert.equal(ctx.document.body.dataset.serverStatus,'verified');assert.equal(refreshed,1);
@@ -123,7 +146,7 @@ test('evidence page stays unverified until all four inputs return',async()=>{
 test('evidence input failure does not release its stale-state warning',async()=>{
   const {ctx,notice}=setup();ctx.state.page='evidence';ctx.backend.backtests=[];ctx.backend.experiments=[];
   ctx.seriesItems=[];ctx.fixedEvaluations=[];ctx.markConnectionUncertain('offline');ctx.backend.ready=true;
-  ctx.fetch=async url=>({ok:url!=='/api/experiment-series',status:200,json:async()=>url==='/api/snapshots'?{snapshots:[]}:{jobs:[]}});
+  ctx.fetch=async url=>({ok:url!=='/api/experiment-series',status:200,json:async()=>url==='/api/snapshots'?{snapshots:[]}:url==='/api/training-limits'?trainingLimits():{jobs:[]}});
   await ctx.refreshBackend();
   assert.equal(ctx.document.body.dataset.serverStatus,'unverified');assert.equal(notice.hidden,false);
 });
