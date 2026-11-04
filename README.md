@@ -4,21 +4,21 @@
 
 ## 本机运行
 
-需要 Python 3.12 和 [requirements.txt](requirements.txt) 中的 NumPy、pypdfium2 与 Pillow。已验证环境为 Windows、Python 3.12.14、NumPy 2.3.5、pypdfium2 5.14.0 和 Pillow 12.3.0；使用其他环境前请先安装并验证依赖。PDF 查看在独立限额进程中逐页生成图像；相关许可证及 PDFium 依赖见 [pypdfium2 项目说明](https://github.com/pypdfium2-team/pypdfium2)。项目不包含 Python 运行时。
+需要 Python 3.12 和 [requirements.txt](requirements.txt) 中的 NumPy、pypdfium2、Pillow 与 cryptography。已验证环境为 Windows、Python 3.12.14、NumPy 2.3.5、pypdfium2 5.14.0、Pillow 12.3.0 和 cryptography 50.0.2；使用其他环境前请先安装并验证依赖。PDF 查看在独立限额进程中逐页生成图像；相关许可证及 PDFium 依赖见 [pypdfium2 项目说明](https://github.com/pypdfium2-team/pypdfium2)。项目不包含 Python 运行时。
 
-在项目目录安装依赖：
-
-```powershell
-python -m pip install -r requirements.txt
-```
-
-在项目目录启动本机浏览器服务：
+Windows 可在项目目录准备独立虚拟环境并安装固定版本依赖：
 
 ```powershell
-python -m dlt.app --db runtime/research.sqlite3 --port 8766
+.\setup-local.ps1
 ```
 
-Web 服务与独立计划命令启动时都会核验数据库目录、数据库文件和 SQLite 日志文件的本机访问权限；新建数据库目录会按当前账户限制访问，不安全的既有路径会被拒绝。详见[本机服务数据访问保护](docs/local_access_protection.md)。
+准备完成后启动本机服务：
+
+```powershell
+.\run-local.ps1
+```
+
+服务运行期间保持终端窗口开启，按 Ctrl+C 停止。默认数据库为 `runtime/research.sqlite3`，默认端口为 `8766`；可用 `-Database` 和 `-Port` 参数覆盖，例如 `.\run-local.ps1 -Database runtime/alternate.sqlite3 -Port 8770`。Web 服务与独立计划命令启动时都会核验数据库目录、数据库文件和 SQLite 日志文件的本机访问权限；新建数据库目录会按当前账户限制访问，不安全的既有路径会被拒绝。详见[本机服务数据访问保护](docs/local_access_protection.md)。
 
 浏览器访问 `http://127.0.0.1:8766/`。训练页可载入工作区已有的历史研究快照，配置并提交树模型或 LSTM 训练；历史快照不代表本次实时联网核验。训练完成后可从任务进入方案生成，或在生成页选择可用产物，生成并保存候选和同成本、同结构随机对照，并用固定历史奖金或用户自定义奖金情景评估具体子注。刷新后可恢复草稿及评估。目标期、日期和价格目前由使用者输入，属于未核验的研究情景，不是前瞻登记或购买建议。模型尚需独立回测，模型评分不是中奖概率。以文件方式直接打开原型时无法执行真实训练或保存这些后端草稿。
 
