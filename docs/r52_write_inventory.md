@@ -20,7 +20,7 @@
 | 组合生成、模型选择决策与收益评估 | `/api/pairs`、`/api/model-selection-decisions`、`/api/model-selection-decisions/fence`、`/api/evaluations`、对应封止路由及 `/api/pair-evaluation-writes` | IndexedDB 严格持久请求日志、Web Locks、提交前留存原键与完整输入；精确请求状态查询、原键继续、原子封止、封止后一次同输入直接关联重试；草稿/评估/选择决策业务行与接受回执同事务提交；模型选择以不可变序列追加，读取时核对回执和序列末条；后台评估完成状态与请求接受分开表达 | 仅源码静态检查；真实 HTTP、生成/选择/评估中途封止、刷新/重启和并发验收未完成 |
 | 本地捆绑快照导入 | `/api/snapshots/import-bundled`、`/api/snapshots/import-bundled-status`、`/api/snapshots/import-bundled-fence` | 浏览器先持久保存请求键；服务端在同一导入事务写入内容摘要和结果回执；同键同内容返回原结果、同键不同内容拒绝；不同请求键的相同快照复用已留存来源观察，避免重复观察副作用；可事务封止原请求，并仅允许一次同内容直接关联重试 | 仅源码及语法检查；真实浏览器、丢包、封止/提交竞争、并发和重启验收仍待执行 |
 | 滚动/静态自动登记计划 | `/api/rolling-registration-plans`、`/api/static-registration-plans` 及取消/重试 | 前端 IndexedDB/Web Locks、状态查询、继续、封止、关联重试；服务端写回执与计划变更事务协调；完整性检查请求与业务计划 | 仅源码/语法核对；真实断连、并发、重启验收未完成 |
-| 来源复核与更正 | `/api/source-reviews`、`/api/source-corrections`、`/api/source-corrections/retry` | 来源原文和请求先存 IndexedDB；状态查询、继续、封止、同内容关联重试、核实后清理；接受回执与来源/更正事务关联，follow-up 状态单独表达；更正复算重试现以 `paper_write_requests` 回执和独立 IndexedDB 操作记录持久化，并在同一 SQLite 事务将失败任务排回 pending，状态查询返回当前 follow-up | 来源复核已覆盖真实 Chrome/LocalServer 响应丢失及刷新恢复；来源更正已覆盖 HTTP 丢响应和提交/封止竞态。产品表单、多标签竞态、进程重启及其余写入族仍待验收 |
+| 来源复核与更正 | `/api/source-reviews`、`/api/source-corrections`、`/api/source-corrections/retry` | 来源原文和请求先存 IndexedDB；状态查询、继续、封止、同内容关联重试、核实后清理；接受回执与来源/更正事务关联，follow-up 状态单独表达；更正复算重试现以 `paper_write_requests` 回执和独立 IndexedDB 操作记录持久化，并在同一 SQLite 事务将失败任务排回 pending，状态查询返回当前 follow-up | 来源复核已通过真实 Chrome 产品表单提交到 LocalServer、丢响应后刷新恢复并经页面核实清理；来源更正已覆盖 HTTP 丢响应和提交/封止竞态。来源复核多标签、服务/浏览器进程重启及其他写入族仍待验收 |
 | 多期实验系列创建 | `/api/experiment-series`、`/write-status`、`/fence` | 发送前以系列键和完整 manifest 写入 IndexedDB；服务端在系列记录事务中保存不可变请求与结果，支持未知/接受/封止查询、事务封止及一次同内容直接关联重试；封止与迟到创建互斥 | 仅源码及语法检查；真实浏览器、丢包、封止/提交竞争、并发及重启恢复未验收 |
 | 滚动训练计划命令 | `/api/rolling-training-plans`、`/cancel`、`/retry` | 创建/取消/重试均先存 IndexedDB；原键查询、继续、封止、关联同内容重试；服务端回执与计划变更同事务，封止与迟到提交互斥 | 仅源码语法核对；失败后重试仍受计划业务状态约束；未做真实浏览器、HTTP 丢包、并发或重启验收 |
 | 加密快照解密候选/激活 | `/api/encrypted-backup/prepare-candidate`、`/activate-candidate`、`/api/recovery-write-status`、`/api/recovery-writes/fence` | 稳定请求键/摘要、严格持久 IndexedDB（不含口令）、服务端接受/封止与一次性关联重试、目标数据库不可变回执及中断后协调；路径限制和目标不覆盖 | 仅源码与语法检查；真实浏览器、HTTP 丢包、并发、刷新/重启恢复未验收；R52 整体仍未完成 |
@@ -99,7 +99,7 @@
 
 `tests/test_source_write_journal_browser.cjs` 以 Chrome headless 加载真实来源写入日志模块，使用浏览器 IndexedDB 严格持久事务和 `navigator.locks`。请求已在本地测试端点记录接受后模拟 HTTP 响应丢失；同一对象的重叠操作被锁拦截；刷新后原键仍可从 IndexedDB 读取，查询回执后核实清理。该浏览器用例与内存协调器用例共 17 项通过。状态端点是测试替身，不是项目 `LocalServer`；未验证跨标签调度、浏览器进程重启、服务重启或产品页面真实表单路径。
 
-同一来源复核族新增 `tests/test_source_write_journal_localserver_browser.cjs` 联调：真实 Chrome 打开项目应用源站并加载实际写入日志脚本，使用测试 `LocalServer` 将合成来源复核写入 SQLite；CDP 在后端 200 响应产生后切断浏览器连接。刷新后原 IndexedDB 请求仍在，状态查询核实接受回执，来源列表只有一条匹配原文。该集成用例、前一浏览器持久化用例及既有协调器回归共 18 项通过。浏览器仍通过脚本直接调用协调器，未操作实际表单；其他写入族及跨标签/服务重启场景未覆盖。
+同一来源复核族新增 `tests/test_source_write_journal_localserver_browser.cjs` 联调：真实 Chrome 通过前瞻页的来源复核产品表单提交合成原件，实际 `saveSourceReview` 与 IndexedDB 协调器向测试 `LocalServer` 写入 SQLite；CDP 在后端 200 响应产生后切断浏览器连接。表单保留待确认请求并展示错误；刷新后产品恢复 UI 自动核实接受回执，状态 API 与来源列表对应同一请求和原件、业务记录只有一条；最后经页面“核实后清理”按钮删除本机副本。该集成、前一浏览器持久化切片及协调器回归共 18 项通过。仅覆盖单标签来源复核刷新恢复；来源复核跨标签、服务/浏览器进程重启和其他写入族未覆盖。
 
 ## 关联重试接受状态查询修正（2026-11-04）
 

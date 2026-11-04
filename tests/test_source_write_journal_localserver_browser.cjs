@@ -122,54 +122,32 @@ test('real Chrome restores a lost source-review response against LocalServer aft
       throw new Error('application or source journal did not load in Chrome');
     };
     await waitForPage();
+    await evaluate(`document.querySelector('#navigation a[href="#prospective"]').click()`);
+    for (let i = 0; i < 300; i++) {
+      if (await evaluate("Boolean(document.querySelector('#review-form') && document.body.dataset.serverStatus==='verified')")) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(await evaluate("Boolean(document.querySelector('#review-form') && document.body.dataset.serverStatus==='verified')"), true,
+      'source review form did not become ready against the local service');
 
-    const key = '00000000-0000-4000-8000-000000000031';
-    const setup = `(() => {
-      const api = {
-        async digest(request) {
-          const bytes = new TextEncoder().encode(SourceWriteJournal.canonical(request));
-          const hash = await crypto.subtle.digest('SHA-256', bytes);
-          return Array.from(new Uint8Array(hash), value => value.toString(16).padStart(2, '0')).join('');
-        },
-        objectKey(operation, request) { return request.kind + ':' + request.document_sha256; },
-        async post(body) {
-          const session = await fetch('/api/session', {credentials:'same-origin'}).then(response => response.json());
-          return fetch('/api/source-reviews', {method:'POST', credentials:'same-origin',
-            headers:{'content-type':'application/json','X-DLT-CSRF':session.csrf}, body:JSON.stringify(body)})
-            .then(async response => { const data=await response.json(); if(!response.ok)throw new Error(data.error||'source write failed'); return data; });
-        },
-        async status(request_key, request_sha256) {
-          const response = await fetch('/api/source-write-status?request_key='+encodeURIComponent(request_key)
-            +'&request_sha256='+encodeURIComponent(request_sha256), {credentials:'same-origin'});
-          const data = await response.json(); if(!response.ok)throw new Error(data.error||'status failed'); return data.write;
-        },
-        async fence(body) {
-          const session = await fetch('/api/session', {credentials:'same-origin'}).then(response => response.json());
-          const response = await fetch('/api/source-writes/fence', {method:'POST',credentials:'same-origin',
-            headers:{'content-type':'application/json','X-DLT-CSRF':session.csrf},body:JSON.stringify(body)});
-          const data=await response.json(); if(!response.ok&&response.status!==409)throw new Error(data.error||'fence failed'); return data.write;
-        }
-      };
-      window.makeSourceJournal = () => SourceWriteJournal.coordinator({store:SourceWriteJournal.browserStore(indexedDB),
-        locks:navigator.locks,api,uuid:()=> '${key}'});
-    })()`;
-    await evaluate(setup);
-    const startedPromise = evaluate(`(async () => {
-      const text = 'synthetic browser integration document';
-      const bytes = new TextEncoder().encode(text);
-      const hash = await crypto.subtle.digest('SHA-256', bytes);
-      const document_sha256 = Array.from(new Uint8Array(hash), value => value.toString(16).padStart(2,'0')).join('');
-      const request = {kind:'calendar',source_url:'https://www.sporttery.cn/synthetic-test',document_sha256,
-        document_size:bytes.length,document_name:'browser-source.txt',extracted:{synthetic:'only'},
-        reviewer_note:'synthetic browser integration only',confirmed:true};
-      const binary = String.fromCharCode(...bytes);
-      const body = {...request,document_base64:btoa(binary)};
-      let error='';
-      try { await window.makeSourceJournal().begin('source_review',request,body); } catch (caught) { error=caught.message; }
-      const [entry] = await window.makeSourceJournal().list();
-      return {error,entry,document_sha256};
-    })()`);
+    const documentPath = path.join(dataDirectory, 'browser-source.txt');
+    const documentBytes = Buffer.from('synthetic browser integration document', 'utf8');
+    fs.writeFileSync(documentPath, documentBytes);
+    const documentTree = await send('DOM.getDocument', { depth: -1 });
+    const fileInput = await send('DOM.querySelector', { nodeId: documentTree.root.nodeId, selector: '#review-file' });
+    assert.ok(fileInput.nodeId, 'product source file input was not found');
+    await send('DOM.setFileInputFiles', { nodeId: fileInput.nodeId, files: [documentPath] });
     shouldDrop = true;
+    await evaluate(`(() => {
+      const form=document.querySelector('#review-form');
+      form.closest('details').open=true;
+      form.elements.kind.value='calendar';
+      form.elements.url.value='https://www.sporttery.cn/synthetic-test';
+      form.elements.extracted.value=JSON.stringify({synthetic:'only'});
+      form.elements.note.value='synthetic browser integration only';
+      form.elements.confirmed.checked=true;
+      form.requestSubmit();
+    })()`);
     let responseTimer;
     const responseTimedOut = new Promise((_, reject) => {
       responseTimer = setTimeout(() => reject(new Error('source review did not reach the real server')), 30000);
@@ -178,31 +156,60 @@ test('real Chrome restores a lost source-review response against LocalServer aft
     clearTimeout(responseTimer);
     assert.equal(paused.responseStatusCode, 200);
     await send('Fetch.failRequest', { requestId: paused.requestId, errorReason: 'ConnectionReset' });
-    const started = await startedPromise;
-    assert.match(started.error, /Failed to fetch|NetworkError|fetch/);
-    assert.equal(started.entry.phase, 'submitted');
+    let submitted;
+    for (let i = 0; i < 300; i++) {
+      submitted = await evaluate(`(async()=>({error:document.querySelector('#review-error')?.textContent||'',entries:await new Promise((resolve,reject)=>{
+        const request=indexedDB.open('dlt-source-write-journal',1);
+        request.onerror=()=>reject(request.error);
+        request.onsuccess=()=>{const db=request.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}};
+      })}))()`);
+      if (submitted.entries.length === 1 && submitted.entries[0].phase === 'submitted') break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(submitted.entries.length, 1, 'product form did not persist the request in browser storage');
+    assert.equal(submitted.entries[0].phase, 'submitted');
+    assert.match(submitted.error, /fetch|network|连接/i);
+    const { createHash } = require('node:crypto');
+    const documentSha256 = createHash('sha256').update(documentBytes).digest('hex');
 
     await send('Page.reload', { ignoreCache: true });
     await waitForPage();
-    await evaluate(setup);
-    const recovered = await evaluate(`(async () => {
-      const journal = window.makeSourceJournal();
-      const entries = await journal.list();
-      const checked = await journal.check('${key}');
-      const stateResponse = await fetch('/api/source-write-status?request_key='+encodeURIComponent('${key}')
-        +'&request_sha256='+encodeURIComponent(entries[0].request_sha256),{credentials:'same-origin'});
-      const state = await stateResponse.json();
-      const reviews = await fetch('/api/source-reviews',{credentials:'same-origin'}).then(response=>response.json());
-      await journal.dismiss('${key}');
-      return {entries,checked,state:state.write,reviews,remainder:await journal.list()};
-    })()`);
+    await evaluate(`document.querySelector('#navigation a[href="#prospective"]')?.click()`);
+    let recovered;
+    for (let i = 0; i < 300; i++) {
+      recovered = await evaluate(`(async()=>({
+        ready:document.body.dataset.serverStatus==='verified',
+        entries:await new Promise((resolve,reject)=>{const request=indexedDB.open('dlt-source-write-journal',1);
+          request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+            get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}}),
+        dismiss:!!document.querySelector('#source-write-journal [data-source-write="dismiss"]')
+      }))()`);
+      if (recovered.ready && recovered.entries.length === 1 && recovered.dismiss) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
     assert.equal(recovered.entries.length, 1);
-    assert.equal(recovered.entries[0].phase, 'submitted');
-    assert.equal(recovered.checked.phase, 'accepted');
-    assert.equal(recovered.state.status, 'accepted');
-    assert.equal(recovered.reviews.reviews.filter(review => review.review_id === recovered.state.result.review_id
-      && review.document_sha256 === started.document_sha256).length, 1);
-    assert.equal(recovered.remainder.length, 0);
+    assert.equal(recovered.entries[0].phase, 'accepted', 'product recovery UI did not persist the verified server receipt');
+    assert.equal(recovered.dismiss, true, 'product recovery UI did not verify the accepted request');
+    const key = recovered.entries[0].request_key;
+    const state = await evaluate(`(async()=>fetch('/api/source-write-status?request_key='+encodeURIComponent('${key}')
+      +'&request_sha256='+encodeURIComponent('${recovered.entries[0].request_sha256}'),{credentials:'same-origin'})
+      .then(response=>response.json()))()`);
+    assert.equal(state.write.status, 'accepted');
+    const reviews = await evaluate("fetch('/api/source-reviews',{credentials:'same-origin'}).then(response=>response.json())");
+    const matchingReviews = reviews.reviews.filter(review => review.review_id === state.write.result.review_id
+      && review.document_sha256 === documentSha256);
+    assert.equal(matchingReviews.length, 1);
+    await evaluate(`document.querySelector('#source-write-journal [data-source-write="dismiss"]').click()`);
+    let remainder;
+    for (let i = 0; i < 100; i++) {
+      remainder = await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.open('dlt-source-write-journal',1);
+        request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      if (remainder.length === 0) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(remainder.length, 0, 'product recovery UI did not clear the verified local copy');
   } finally {
     try { socket?.close(); } catch {}
     for (const process of [chromeProcess, serverProcess]) {
