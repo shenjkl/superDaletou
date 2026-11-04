@@ -111,6 +111,76 @@ class SourceCorrectionHttpTests(unittest.TestCase):
         self.assertEqual(current['status'], 'locally_attested')
         self.assertNotEqual(current['group_id'], original['group_id'])
 
+    def test_correction_lost_response_status_replay_and_fence_over_http(self):
+        from dlt.app import Handler
+
+        self.import_draw(self.draw)
+        body = self.correction_body()
+        request, read, write = self.start_server()
+        ready = threading.Event()
+        release = threading.Event()
+        errors = []
+        original_json = Handler._json
+
+        def drop_committed_response(handler, response_status, data, **kwargs):
+            if (handler.path == '/api/source-corrections' and response_status == 200
+                    and data.get('write', {}).get('status') == 'accepted'):
+                ready.set()
+                if not release.wait(timeout=10):
+                    raise TimeoutError('test did not release the dropped correction response')
+                handler.connection.close()
+                return
+            return original_json(handler, response_status, data, **kwargs)
+
+        def submit():
+            try:
+                request('POST', '/api/source-corrections', json.dumps(body), write)
+            except Exception as exc:
+                errors.append(exc)
+
+        with patch.object(Handler, '_json', drop_committed_response):
+            worker = threading.Thread(target=submit)
+            worker.start()
+            try:
+                self.assertTrue(ready.wait(timeout=10), 'correction did not reach its committed response')
+                status, _, current = request(
+                    'GET', '/api/source-write-status?request_key='+body['request_key']
+                    +'&request_sha256='+body['request_sha256'], headers=read)
+                self.assertEqual(status, 200)
+                self.assertEqual(current['write']['status'], 'accepted')
+                correction_id = current['write']['result']['correction_id']
+                self.assertTrue(correction_id)
+            finally:
+                release.set()
+                worker.join(timeout=10)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(errors[0], (http.client.RemoteDisconnected, ConnectionError, OSError))
+
+        status, _, replay = request('POST', '/api/source-corrections', json.dumps(body), write)
+        self.assertEqual(status, 200, replay)
+        self.assertEqual(replay['write']['status'], 'accepted')
+        self.assertEqual(replay['write']['result']['correction_id'], correction_id)
+        self.assertEqual(len(self.repo.list_source_corrections()), 1)
+
+        # A fence committed first must exclude the delayed correction request.
+        fenced = self.correction_body()
+        request_data = {key: value for key, value in fenced.items()
+                        if key not in ('request_key', 'request_sha256')}
+        fence_body = {'request_key': fenced['request_key'], 'operation': 'source_correction',
+                      'request': request_data, 'request_sha256': fenced['request_sha256']}
+        status, _, fence_result = request('POST', '/api/source-writes/fence',
+                                          json.dumps(fence_body), write)
+        self.assertEqual(status, 409, fence_result)
+        self.assertEqual(fence_result['write']['status'], 'fenced')
+        status, _, late = request('POST', '/api/source-corrections', json.dumps(fenced), write)
+        self.assertEqual(status, 409, late)
+        self.assertEqual(len(self.repo.list_source_corrections()), 1)
+        status, _, current = request(
+            'GET', '/api/source-write-status?request_key='+fenced['request_key']
+            +'&request_sha256='+fenced['request_sha256'], headers=read)
+        self.assertEqual((status, current['write']['status']), (200, 'fenced'))
+
 
 if __name__ == '__main__':
     unittest.main()
