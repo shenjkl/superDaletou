@@ -733,6 +733,8 @@ R23 保留范围一次性协议边界核对（2026-11-04）：当前代码核验
 阶段2/7 Windows ACL 与隔离恢复闭环（2026-11-04）：Windows 既有 ACL 核验及新目录保护改用 Advapi32 安全描述符/DACL API，去除对无法加载的 PowerShell `Microsoft.PowerShell.Security` 模块依赖；现有安全合同不变，未知/宽权限 ACE 仍失败关闭，新目录仅授予当前账户、SYSTEM 和本机 Administrators。启动 CLI 在创建单实例锁前先核验路径 ACL 与恢复隔离状态，避免隔离候选拒绝启动时留下锁文件。Windows ACL、CLI 锁顺序、隔离副本、损坏库拒绝、WAL 一致复制及运行任务保留等恢复测试共 23 项全部通过（Python 3.12.10，受保护测试目录）。另在真实受保护临时目录启动 `LocalServer` 并请求 `/api/session`，收到 HTTP 200。未运行真实浏览器、Windows 登录启动/重启或 AC73—AC79 刷新恢复验收；阶段2与阶段7及完整首版仍未完成。
 
 阶段2/T06 前端计划表运行时修复（2026-11-04）：修复数据页更新计划表渲染引用未定义变量 limits 导致整页异常的问题；超时输入范围改为服务端一致的 1–120 秒。补齐/校正多个过期 CJS 测试夹具后，单测隔离执行 23 个脚本：18 通过、5 未通过或超时（来源声明、连接生命周期、自定义奖金字段、加密备份异步断言、评估版本写回执夹具仍需处理），因此不视为前端验收完成。
-ode --check prototype/app.js 与 git diff --check 通过。仓库已有 MIT LICENSE，README 已说明原创内容授权及第三方源码快照不随之授权；此项无需新增文件。
+node --check prototype/app.js 与 git diff --check 通过。仓库已有 MIT LICENSE，README 已说明原创内容授权及第三方源码快照不随之授权；此项无需新增文件。
 
 阶段7 AC73 真实浏览器离线状态切片（2026-11-04）：在真实 Chrome 中加载当前原型并逐一进入 8 个页面；八页均显示本机服务连接无法确认的提示，主要内容正常挂载，未见控制台 error。此检查通过临时 loopback 静态服务，仅覆盖页面启动和静态断连状态；未连接应用 API，不能证明数据重核、写入阻断/保留、重连、旧请求迟到、IndexedDB/Web Locks、响应丢失或 AC74—AC79。临时服务已停止。
+
+阶段2/T06 与阶段7/R52 服务端写入竞争回归（2026-11-04）：迁移研究决策夹具至 UUID 系列标识；修正恢复候选测试提前退出临时目录并将 ACL 检查留给独立恢复保护用例；更新旧断言以核验过期回执不能确认或释放新请求占用。PYTHONPATH=tests python -m unittest test_research_decisions -v 25 项全部通过；R52 浏览器写入协调器 tests/test_fixed_experiment_journal.cjs 与 tests/test_research_write_journal.cjs 合计 22 项通过。Python 测试在系统 Python 3.10.9 执行，项目支持运行时为 Python 3.12；结果属于当前环境的组件回归，不作为正式服务运行时验收。AC76—79 真实浏览器、IndexedDB/Web Locks、HTTP 丢包和服务重启仍未完成。

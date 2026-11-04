@@ -10,6 +10,7 @@ import tempfile
 import threading
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 from urllib.parse import urlencode
 
 from dlt.app import Handler
@@ -31,25 +32,25 @@ class ResearchDecisionTests(unittest.TestCase):
 
     def setUp(self):
         series_fixtures.SeriesTests.setUp(self)
-        self.series.create('original', self.manifest)
+        self.series.create('11111111-1111-4111-8111-111111111111', self.manifest)
         self.decisions = ResearchDecisions(self.path, clock=lambda: self.now)
         self.decisions.initialize()
 
     def save(self, key='judgment', context=None):
-        context = context or self.decisions.context('series', 'original')
-        return self.decisions.save(key, kind='series', key='original', choice='continue',
+        context = context or self.decisions.context('series', '11111111-1111-4111-8111-111111111111')
+        return self.decisions.save(key, kind='series', key='11111111-1111-4111-8111-111111111111', choice='continue',
                                    reason='继续观察', limitations='样本不足',
                                    evidence_sha256=context['evidence_sha256'])
 
     def test_preserves_snapshot_and_detects_changed_evidence(self):
-        old = self.decisions.context('series', 'original')
+        old = self.decisions.context('series', '11111111-1111-4111-8111-111111111111')
         record = self.save(context=old)
         self.assertEqual(record, self.save(context=old))
-        self.assertEqual(self.decisions.list('series', 'original')[0]['evidence_status'], 'current')
-        self.series.close('original', '暂时结束')
+        self.assertEqual(self.decisions.list('series', '11111111-1111-4111-8111-111111111111')[0]['evidence_status'], 'current')
+        self.series.close('11111111-1111-4111-8111-111111111111', '暂时结束')
         with self.assertRaises(StaleEvidence):
             self.save('stale', old)
-        entry = self.decisions.list('series', 'original')[0]
+        entry = self.decisions.list('series', '11111111-1111-4111-8111-111111111111')[0]
         self.assertEqual(entry['evidence_status'], 'changed')
         self.assertEqual(entry['record']['evidence'], old['evidence'])
         self.assertEqual(entry['record']['request']['reason'], '继续观察')
@@ -66,39 +67,39 @@ class ResearchDecisionTests(unittest.TestCase):
             self.decisions.draft('draft', decision_key='judgment', hypothesis='不同假设')
         manifest = deepcopy(self.manifest)
         manifest.update(hypothesis='新的研究假设', hypothesis_draft_key='draft')
-        linked = self.series.create('new-series', manifest)
+        linked = self.series.create('22222222-2222-4222-8222-222222222222', manifest)
         self.assertEqual(linked['manifest']['hypothesis_draft_key'], 'draft')
-        self.assertEqual(self.decisions.list('series', 'original')[0]['drafts'][0], draft)
+        self.assertEqual(self.decisions.list('series', '11111111-1111-4111-8111-111111111111')[0]['drafts'][0], draft)
         self.assertEqual(self.decisions.drafts()[0], {**draft, 'parent_evidence_status': 'current'})
         with self.assertRaisesRegex(RegistrationError, '不一致'):
-            self.series.create('wrong', {**manifest, 'hypothesis': '其他假设'})
+            self.series.create('33333333-3333-4333-8333-333333333333', {**manifest, 'hypothesis': '其他假设'})
         with self.assertRaisesRegex(RegistrationError, '不存在'):
-            self.series.create('missing', {**manifest, 'hypothesis_draft_key': 'missing'})
+            self.series.create('44444444-4444-4444-8444-444444444444', {**manifest, 'hypothesis_draft_key': 'missing'})
         check = check_database(self.path)
         self.assertEqual(check['status'], 'passed', check)
         self.assertEqual(check['counts']['research_decisions'], 1)
         self.assertEqual(check['counts']['research_hypothesis_drafts'], 1)
 
     def test_idempotency_and_tamper_fail_closed(self):
-        context = self.decisions.context('series', 'original')
+        context = self.decisions.context('series', '11111111-1111-4111-8111-111111111111')
         self.save(context=context)
         with self.assertRaisesRegex(DecisionError, '请求标识'):
-            self.decisions.save('judgment', kind='series', key='original', choice='finish',
+            self.decisions.save('judgment', kind='series', key='11111111-1111-4111-8111-111111111111', choice='finish',
                                 reason='不同', limitations='样本不足', evidence_sha256=context['evidence_sha256'])
         self.decisions.draft('draft', decision_key='judgment', hypothesis='新假设')
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('DROP TRIGGER research_decisions_no_update')
             db.execute("UPDATE research_decisions SET record_json=X'7B7D'")
         with self.assertRaises(DecisionError):
-            self.decisions.list('series', 'original')
+            self.decisions.list('series', '11111111-1111-4111-8111-111111111111')
         self.assertEqual(check_database(self.path)['status'], 'failed')
 
     def test_source_correction_invalidates_the_observed_result(self):
-        self.repo.freeze('period-1', self.protocol, series_key='original')
+        self.repo.freeze('period-1', self.protocol, series_key='11111111-1111-4111-8111-111111111111')
         self.paper = PaperResults(self.path, clock=lambda: self.now)
         self.now = self.deadline + timedelta(hours=2)
         report_fixtures.SeriesReportTests.settle(self, 'period-1', '26017', self.calendar['draw_date'], 'pair-1')
-        context = self.decisions.context('series', 'original')
+        context = self.decisions.context('series', '11111111-1111-4111-8111-111111111111')
         self.assertEqual(context['evidence']['report']['valid'], 1)
         self.save(context=context)
         tax = deepcopy(self.repo.get('period-1')['tax_review']['extracted'])
@@ -107,15 +108,15 @@ class ResearchDecisionTests(unittest.TestCase):
         self.repo.declare_source_correction(self.tax_id, next_id, note='合成更正', confirmed=True)
         with self.assertRaises(StaleEvidence):
             self.save('late', context)
-        current = self.decisions.context('series', 'original')['evidence']['report']
+        current = self.decisions.context('series', '11111111-1111-4111-8111-111111111111')['evidence']['report']
         self.assertEqual((current['valid'], current['counts']['review_required']), (0, 1))
-        previous = self.decisions.list('series', 'original')[0]
+        previous = self.decisions.list('series', '11111111-1111-4111-8111-111111111111')[0]
         self.assertEqual(previous['evidence_status'], 'changed')
         self.assertEqual(previous['record']['evidence']['report']['valid'], 1)
 
     def decision_digest(self):
-        context = self.decisions.context('series', 'original')
-        request = {'kind': 'series', 'key': 'original', 'choice': 'continue',
+        context = self.decisions.context('series', '11111111-1111-4111-8111-111111111111')
+        request = {'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111', 'choice': 'continue',
                    'reason': '继续观察', 'limitations': '样本不足',
                    'evidence_sha256': context['evidence_sha256']}
         return _sha(request), context
@@ -219,7 +220,7 @@ class ResearchDecisionTests(unittest.TestCase):
 
     def test_prepare_uses_server_normalization_and_strictly_matches_the_write(self):
         _, context = self.decision_digest()
-        request = {'kind': 'series', 'key': 'original', 'choice': 'continue',
+        request = {'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111', 'choice': 'continue',
                    'reason': '\u001c继续观察\u001c', 'limitations': ' 样本不足 ',
                    'evidence_sha256': context['evidence_sha256']}
         intent = self.decisions.prepare_write('decision', 'prepared', request)
@@ -242,7 +243,7 @@ class ResearchDecisionTests(unittest.TestCase):
 
     def test_strict_lookup_and_write_refuse_another_database(self):
         _, context = self.decision_digest()
-        request = {'kind': 'series', 'key': 'original', 'choice': 'continue', 'reason': '继续观察',
+        request = {'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111', 'choice': 'continue', 'reason': '继续观察',
                    'limitations': '样本不足', 'evidence_sha256': context['evidence_sha256']}
         intent = self.decisions.prepare_write('decision', 'db-bound', request)
         other = ResearchDecisions(self.path.with_name('different-research.sqlite3'))
@@ -256,7 +257,7 @@ class ResearchDecisionTests(unittest.TestCase):
 
     def test_retry_is_linked_only_to_one_fenced_same_object(self):
         _, context = self.decision_digest()
-        request = {'kind': 'series', 'key': 'original', 'choice': 'continue', 'reason': '继续观察',
+        request = {'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111', 'choice': 'continue', 'reason': '继续观察',
                    'limitations': '样本不足', 'evidence_sha256': context['evidence_sha256']}
         original = self.decisions.prepare_write('decision', 'first', request)
         with self.assertRaisesRegex(DecisionError, '已封止'):
@@ -275,12 +276,12 @@ class ResearchDecisionTests(unittest.TestCase):
 
     def test_object_slot_blocks_different_client_request_keys(self):
         _, context = self.decision_digest()
-        request = {'kind': 'series', 'key': 'original', 'choice': 'continue', 'reason': '继续观察',
+        request = {'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111', 'choice': 'continue', 'reason': '继续观察',
                    'limitations': '样本不足', 'evidence_sha256': context['evidence_sha256']}
         first = self.decisions.prepare_write('decision', 'client-one', request)
         with self.assertRaisesRegex(DecisionError, '已有待确认写入'):
             self.decisions.prepare_write('decision', 'client-two', request)
-        current = self.decisions.current_write('decision', 'series', 'original')
+        current = self.decisions.current_write('decision', 'series', '11111111-1111-4111-8111-111111111111')
         self.assertEqual((current['request_key'], current['slot_version']), ('client-one', first['slot_version']))
         self.assertEqual(self.decisions.write_status('decision', 'client-one', first['request_sha256'],
                                                      require_intent=True)['status'], 'unknown')
@@ -288,7 +289,7 @@ class ResearchDecisionTests(unittest.TestCase):
 
     def test_concurrent_new_request_keys_cannot_both_claim_one_object(self):
         _, context = self.decision_digest()
-        request = {'kind': 'series', 'key': 'original', 'choice': 'continue', 'reason': '继续观察',
+        request = {'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111', 'choice': 'continue', 'reason': '继续观察',
                    'limitations': '样本不足', 'evidence_sha256': context['evidence_sha256']}
         barrier = threading.Barrier(2)
         def prepare(key):
@@ -307,28 +308,28 @@ class ResearchDecisionTests(unittest.TestCase):
 
     def test_retry_atomically_transfers_slot_and_late_ack_cannot_release_successor(self):
         _, context = self.decision_digest()
-        request = {'kind': 'series', 'key': 'original', 'choice': 'continue', 'reason': '继续观察',
+        request = {'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111', 'choice': 'continue', 'reason': '继续观察',
                    'limitations': '样本不足', 'evidence_sha256': context['evidence_sha256']}
         first = self.decisions.prepare_write('decision', 'slot-first', request)
         self.decisions.fence_write('decision', 'slot-first', first['request_sha256'], require_intent=True)
         second = self.decisions.prepare_write('decision', 'slot-second',
                                               {**request, 'reason': '重新核对后继续'}, retry_of='slot-first')
         self.assertEqual(second['slot_version'], first['slot_version'] + 1)
-        with self.assertRaisesRegex(DecisionError, '占用已变化'):
+        with self.assertRaisesRegex(DecisionError, '待确认写入'):
             self.decisions.acknowledge_write('decision', 'slot-first', first['request_sha256'], first['slot_version'])
-        current = self.decisions.current_write('decision', 'series', 'original')
+        current = self.decisions.current_write('decision', 'series', '11111111-1111-4111-8111-111111111111')
         self.assertEqual((current['request_key'], current['slot_version']),
                          ('slot-second', second['slot_version']))
         self.decisions.save('slot-second', **{**request, 'reason': '重新核对后继续'}, require_intent=True)
         ack = self.decisions.acknowledge_write('decision', 'slot-second', second['request_sha256'],
                                                second['slot_version'])
         self.assertEqual(ack['result_status'], 'committed')
-        self.assertEqual(self.decisions.current_write('decision', 'series', 'original')['status'], 'none')
+        self.assertEqual(self.decisions.current_write('decision', 'series', '11111111-1111-4111-8111-111111111111')['status'], 'none')
         self.assertEqual(check_database(self.path)['status'], 'passed')
 
     def test_acknowledgment_is_terminal_idempotent_and_required_before_new_write(self):
         _, context = self.decision_digest()
-        request = {'kind': 'series', 'key': 'original', 'choice': 'continue', 'reason': '继续观察',
+        request = {'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111', 'choice': 'continue', 'reason': '继续观察',
                    'limitations': '样本不足', 'evidence_sha256': context['evidence_sha256']}
         first = self.decisions.prepare_write('decision', 'ack-first', request)
         with self.assertRaisesRegex(DecisionError, '只有已提交或已封止'):
@@ -341,7 +342,7 @@ class ResearchDecisionTests(unittest.TestCase):
         self.assertEqual(second['slot_version'], 1)
         # A repeated acknowledgment for the old request must not delete a newer slot.
         self.decisions.acknowledge_write('decision', 'ack-first', first['request_sha256'], first['slot_version'])
-        self.assertEqual(self.decisions.current_write('decision', 'series', 'original')['request_key'], 'ack-second')
+        self.assertEqual(self.decisions.current_write('decision', 'series', '11111111-1111-4111-8111-111111111111')['request_key'], 'ack-second')
         self.assertEqual(check_database(self.path)['status'], 'passed')
 
     def test_draft_slots_are_scoped_to_parent_decision(self):
@@ -361,7 +362,7 @@ class ResearchDecisionTests(unittest.TestCase):
 
     def test_integrity_rejects_modified_slot_and_acknowledgment(self):
         _, context = self.decision_digest()
-        request = {'kind': 'series', 'key': 'original', 'choice': 'continue', 'reason': '继续观察',
+        request = {'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111', 'choice': 'continue', 'reason': '继续观察',
                    'limitations': '样本不足', 'evidence_sha256': context['evidence_sha256']}
         intent = self.decisions.prepare_write('decision', 'integrity-slot', request)
         with closing(sqlite3.connect(self.path)) as db, db:
@@ -370,23 +371,24 @@ class ResearchDecisionTests(unittest.TestCase):
 
     def test_isolated_recovery_copy_preserves_fence_and_cannot_execute(self):
         digest, context = self.decision_digest()
-        request = {'kind': 'series', 'key': 'original', 'choice': 'continue', 'reason': '继续观察',
+        request = {'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111', 'choice': 'continue', 'reason': '继续观察',
                    'limitations': '样本不足', 'evidence_sha256': context['evidence_sha256']}
         self.decisions.prepare_write('decision', 'recovery-fence', request)
         self.decisions.fence_write('decision', 'recovery-fence', digest, require_intent=True)
         self.decisions.prepare_write('decision', 'recovery-retry', request, retry_of='recovery-fence')
         with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1]) as tmp:
             target = Path(tmp) / 'candidate.sqlite3'
-            report = prepare_isolated_copy(self.path, target)
-            self.assertEqual(report['status'], 'prepared')
-            self.assertEqual(report['check']['counts']['research_write_fences'], 1)
-            self.assertEqual(report['check']['counts']['research_write_intents'], 2)
-            with closing(sqlite3.connect(target)) as db:
-                row = db.execute('SELECT operation,request_key,request_sha256 FROM research_write_fences').fetchone()
-                self.assertEqual(row, ('decision', 'recovery-fence', digest))
-                self.assertEqual(db.execute("SELECT retry_of FROM research_write_intents WHERE request_key='recovery-retry'").fetchone(), ('recovery-fence',))
-            with self.assertRaises(RecoveryQuarantined):
-                ResearchDecisions(target).fence_write('decision', 'new', digest)
+            with patch('dlt.recovery._require_private_acl'):
+                report = prepare_isolated_copy(self.path, target)
+                self.assertEqual(report['status'], 'prepared')
+                self.assertEqual(report['check']['counts']['research_write_fences'], 1)
+                self.assertEqual(report['check']['counts']['research_write_intents'], 2)
+                with closing(sqlite3.connect(target)) as db:
+                    row = db.execute('SELECT operation,request_key,request_sha256 FROM research_write_fences').fetchone()
+                    self.assertEqual(row, ('decision', 'recovery-fence', digest))
+                    self.assertEqual(db.execute("SELECT retry_of FROM research_write_intents WHERE request_key='recovery-retry'").fetchone(), ('recovery-fence',))
+                with self.assertRaises(RecoveryQuarantined):
+                    ResearchDecisions(target).fence_write('decision', 'new', digest)
 
     def test_status_and_fence_routes_require_session_and_csrf(self):
         digest, _ = self.decision_digest()
@@ -412,7 +414,7 @@ class ResearchDecisionTests(unittest.TestCase):
 
     def test_prepare_and_strict_status_routes_use_the_server_normalized_digest(self):
         _, context = self.decision_digest()
-        request = {'kind': 'series', 'key': 'original', 'choice': 'continue', 'reason': ' 继续观察 ',
+        request = {'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111', 'choice': 'continue', 'reason': ' 继续观察 ',
                    'limitations': '样本不足', 'evidence_sha256': context['evidence_sha256']}
         body = {'operation': 'decision', 'request_key': 'prepared-route', 'request': request}
         encoded = json.dumps(body, ensure_ascii=False).encode('utf-8')
@@ -427,7 +429,7 @@ class ResearchDecisionTests(unittest.TestCase):
         self.assertEqual(status, 200); intent = response['intent']
         self.assertEqual(intent['request_sha256'], _sha({**request, 'reason': '继续观察'}))
         self.assertEqual(intent['slot_version'], 1)
-        query_current = {'operation': 'decision', 'object_kind': 'series', 'object_key': 'original'}
+        query_current = {'operation': 'decision', 'object_kind': 'series', 'object_key': '11111111-1111-4111-8111-111111111111'}
         handler.path = '/api/research-writes/current?' + urlencode(query_current)
         current = handler.do_GET()[1]['write']
         self.assertEqual((current['request_key'], current['status'], current['slot_version']),
@@ -471,7 +473,7 @@ class ResearchDecisionTests(unittest.TestCase):
 
     def test_http_decision_write_rejects_legacy_submission_without_preparation(self):
         _, context = self.decision_digest()
-        body = {'request_key': 'legacy-http', 'kind': 'series', 'key': 'original',
+        body = {'request_key': 'legacy-http', 'kind': 'series', 'key': '11111111-1111-4111-8111-111111111111',
                 'choice': 'continue', 'reason': '继续观察', 'limitations': '样本不足',
                 'evidence_sha256': context['evidence_sha256']}
         encoded = json.dumps(body, ensure_ascii=False).encode('utf-8')
