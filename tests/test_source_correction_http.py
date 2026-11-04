@@ -163,23 +163,68 @@ class SourceCorrectionHttpTests(unittest.TestCase):
         self.assertEqual(replay['write']['result']['correction_id'], correction_id)
         self.assertEqual(len(self.repo.list_source_corrections()), 1)
 
-        # A fence committed first must exclude the delayed correction request.
-        fenced = self.correction_body()
+        calendar_update = deepcopy(self.frozen['calendar_review']['extracted'])
+        calendar_update['version'] = 'corrected-calendar-fenced-v2'
+        calendar_id = self.review('calendar', calendar_update)
+        fence_request = {'old_review_id': self.cal_id, 'new_review_id': calendar_id, 'issue': None,
+                         'note': 'synthetic fence-first test', 'confirmed': True}
+        fence_key = str(uuid.uuid4())
+        fenced_first = {**fence_request, 'request_key': fence_key,
+                        'request_sha256': source_write_digest(fence_request)}
+        status, _, fence_result = request('POST', '/api/source-writes/fence', json.dumps({
+            'request_key': fence_key, 'operation': 'source_correction', 'request': fence_request,
+            'request_sha256': fenced_first['request_sha256']}), write)
+        self.assertEqual(status, 409, fence_result)
+        self.assertEqual(fence_result['write']['status'], 'fenced')
+        status, _, late = request('POST', '/api/source-corrections', json.dumps(fenced_first), write)
+        self.assertEqual(status, 409, late)
+        self.assertEqual(len(self.repo.list_source_corrections()), 1)
+
+        # Submit and fence the same new correction concurrently. The SQLite
+        # write lock must select exactly one terminal outcome.
+        corrected_tax = deepcopy(self.frozen['tax_review']['extracted'])
+        corrected_tax['version'] = 'corrected-tax-race-v2'
+        new_tax_id = self.review('tax', corrected_tax)
+        request_data = {'old_review_id': self.tax_id, 'new_review_id': new_tax_id, 'issue': None,
+                        'note': 'synthetic concurrent fence test', 'confirmed': True}
+        fenced = {**request_data, 'request_key': str(uuid.uuid4()),
+                  'request_sha256': source_write_digest(request_data)}
         request_data = {key: value for key, value in fenced.items()
                         if key not in ('request_key', 'request_sha256')}
         fence_body = {'request_key': fenced['request_key'], 'operation': 'source_correction',
                       'request': request_data, 'request_sha256': fenced['request_sha256']}
-        status, _, fence_result = request('POST', '/api/source-writes/fence',
-                                          json.dumps(fence_body), write)
-        self.assertEqual(status, 409, fence_result)
-        self.assertEqual(fence_result['write']['status'], 'fenced')
-        status, _, late = request('POST', '/api/source-corrections', json.dumps(fenced), write)
-        self.assertEqual(status, 409, late)
-        self.assertEqual(len(self.repo.list_source_corrections()), 1)
+        barrier = threading.Barrier(3)
+        outcomes = {}
+
+        def race(name, path, payload):
+            barrier.wait(timeout=10)
+            outcomes[name] = request('POST', path, json.dumps(payload), write)
+
+        with patch('dlt.app.PaperResults.process_source_correction', return_value={'status': 'complete'}):
+            submitter = threading.Thread(target=race,
+                                         args=('submit', '/api/source-corrections', fenced))
+            fencer = threading.Thread(target=race,
+                                      args=('fence', '/api/source-writes/fence', fence_body))
+            submitter.start(); fencer.start(); barrier.wait(timeout=10)
+            submitter.join(timeout=10); fencer.join(timeout=10)
+        self.assertFalse(submitter.is_alive())
+        self.assertFalse(fencer.is_alive())
+        submit_status, _, submit_result = outcomes['submit']
+        fence_status, _, fence_result = outcomes['fence']
         status, _, current = request(
             'GET', '/api/source-write-status?request_key='+fenced['request_key']
             +'&request_sha256='+fenced['request_sha256'], headers=read)
-        self.assertEqual((status, current['write']['status']), (200, 'fenced'))
+        self.assertEqual(status, 200)
+        if current['write']['status'] == 'accepted':
+            self.assertEqual(submit_status, 200, submit_result)
+            self.assertEqual(fence_status, 200, fence_result)
+            self.assertEqual(fence_result['write']['status'], 'accepted')
+            self.assertEqual(len(self.repo.list_source_corrections()), 2)
+        else:
+            self.assertEqual(current['write']['status'], 'fenced')
+            self.assertEqual(submit_status, 409, submit_result)
+            self.assertEqual(fence_status, 409, fence_result)
+            self.assertEqual(len(self.repo.list_source_corrections()), 1)
 
 
 if __name__ == '__main__':
