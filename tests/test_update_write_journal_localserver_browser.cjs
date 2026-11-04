@@ -15,7 +15,7 @@ const browser = [
 const python = process.env.DLT_PYTHON || path.join(repository, '.venv', 'Scripts', 'python.exe');
 const tempRoot = process.env.DLT_BROWSER_TEST_ROOT;
 
-test('real Chrome recovers a lost update-plan response after LocalServer restart', {
+test('real Chrome recovers create and edit responses and verifies update-plan enable/disable', {
   skip: !browser || !tempRoot || !fs.existsSync(python),
   timeout: 180000,
 }, async () => {
@@ -143,7 +143,18 @@ test('real Chrome recovers a lost update-plan response after LocalServer restart
     await connection.send('Runtime.enable');
     let dropResponse = false;
     let resolvePaused;
-    const pausedResponse = new Promise(resolve => { resolvePaused = resolve; });
+    const armResponseDrop = () => {
+      dropResponse = true;
+      return new Promise(resolve => { resolvePaused = resolve; });
+    };
+    const waitForDroppedResponse = async pausedResponse => {
+      let timer;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('update-plan POST did not reach the real server')), 15000);
+      });
+      try { return await Promise.race([pausedResponse, timeout]); }
+      finally { clearTimeout(timer); }
+    };
     let postResponses = 0;
     pageSocket.addEventListener('message', event => {
       const message = JSON.parse(event.data);
@@ -153,7 +164,9 @@ test('real Chrome recovers a lost update-plan response after LocalServer restart
         postResponses++;
         if (dropResponse && params.responseStatusCode === 200) {
           dropResponse = false;
-          resolvePaused(params);
+          const resolve = resolvePaused;
+          resolvePaused = null;
+          resolve(params);
           return;
         }
       }
@@ -180,14 +193,9 @@ test('real Chrome recovers a lost update-plan response after LocalServer restart
       return {valid:form.checkValidity(),values:Object.fromEntries(new FormData(form))};
     })()`);
     assert.equal(filled.valid, true, `synthetic plan form is invalid: ${JSON.stringify(filled)}`);
-    dropResponse = true;
+    const pausedCreation = armResponseDrop();
     await evaluate("document.querySelector('#update-plan-form').requestSubmit()");
-    let responseTimer;
-    const responseTimeout = new Promise((_, reject) => {
-      responseTimer = setTimeout(() => reject(new Error('update-plan POST did not reach the real server')), 15000);
-    });
-    const paused = await Promise.race([pausedResponse, responseTimeout]);
-    clearTimeout(responseTimer);
+    const paused = await waitForDroppedResponse(pausedCreation);
     assert.equal(paused.responseStatusCode, 200, 'server did not accept the update-plan creation');
     await connection.send('Fetch.failRequest', { requestId: paused.requestId, errorReason: 'ConnectionReset' });
     let submitted;
@@ -248,6 +256,133 @@ test('real Chrome recovers a lost update-plan response after LocalServer restart
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     assert.equal(remainder.length, 0, 'product UI did not clear the verified local request');
+
+    const planId = plans[0].id;
+    await evaluate(`document.querySelector('#update-plan-list [data-action="edit-plan"][data-plan="${planId}"]').click()`);
+    let editReady = false;
+    for (let i = 0; i < 100; i++) {
+      editReady = await evaluate("Boolean(document.querySelector('#update-plan-edit-form'))");
+      if (editReady) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    assert.equal(editReady, true, 'paused plan editor did not open');
+    const editValidity = await evaluate(`(() => {const form=document.querySelector('#update-plan-edit-form');
+      form.querySelector('[name="interval"]').value='7200';return form.checkValidity();})()`);
+    assert.equal(editValidity, true, 'updated plan form is invalid');
+    const pausedEditPromise = armResponseDrop();
+    await evaluate("document.querySelector('#update-plan-edit-form').requestSubmit()");
+    const pausedEdit = await waitForDroppedResponse(pausedEditPromise);
+    assert.equal(pausedEdit.responseStatusCode, 200, 'server did not accept the update-plan edit');
+    await connection.send('Fetch.failRequest', { requestId: pausedEdit.requestId, errorReason: 'ConnectionReset' });
+    let pendingEdit;
+    for (let i = 0; i < 300; i++) {
+      pendingEdit = await evaluate(`(async()=>({error:document.querySelector('[data-plan-edit-error]')?.textContent||'',entries:
+        await new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+          r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+            get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})}))()`);
+      if (pendingEdit.entries.some(entry => entry.operation === 'update_plan_edit' && entry.phase === 'submitted')
+          && pendingEdit.error) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    const pendingEditEntry = pendingEdit.entries.find(entry => entry.operation === 'update_plan_edit');
+    assert.equal(pendingEditEntry?.phase, 'submitted', 'product editor did not retain the lost-response request');
+    assert.match(pendingEdit.error, /fetch|network|连接/i);
+    const editServerPid = serverProcess.pid;
+    await stopServer(serverProcess);
+    await startServer();
+    assert.notEqual(serverProcess.pid, editServerPid, 'LocalServer was not restarted before edit recovery');
+    await connection.send('Page.reload', { ignoreCache: true });
+    let editReloaded = false;
+    for (let i = 0; i < 300; i++) {
+      editReloaded = await evaluate("document.readyState==='complete' && Boolean(window.UpdateWriteJournal)");
+      if (editReloaded) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    assert.equal(editReloaded, true, 'application did not reload after edit service restart');
+    let recoveredEdit;
+    for (let i = 0; i < 300; i++) {
+      recoveredEdit = await evaluate(`(async()=>({ready:document.body.dataset.serverStatus==='verified',entries:
+        await new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+          r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+            get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}}),
+        dismiss:!!document.querySelector('#update-write-journal [data-update-write-action="dismiss"][data-request="${pendingEditEntry.request_key}"]')}))()`);
+      if (recoveredEdit.ready && recoveredEdit.dismiss) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    const acceptedEdit = recoveredEdit.entries.find(entry => entry.request_key === pendingEditEntry.request_key);
+    assert.equal(acceptedEdit?.phase, 'accepted', 'product recovery did not retain the edit receipt');
+    const editState = await evaluate(`fetch('/api/update-write-requests?key='+encodeURIComponent('${pendingEditEntry.request_key}'),
+      {credentials:'same-origin'}).then(response=>response.json())`);
+    assert.equal(editState.write.operation, 'update_plan_edit');
+    const editedPlans = await evaluate("fetch('/api/update-plans',{credentials:'same-origin'}).then(response=>response.json())");
+    const editedPlan = editedPlans.plans.find(plan => plan.id === planId);
+    assert.equal(editedPlan.config.interval_seconds, 7200, 'server did not retain the edited interval');
+    assert.equal(editedPlan.enabled, false, 'editing must leave the plan paused');
+    await evaluate(`window.confirm=()=>true;document.querySelector('#update-write-journal [data-update-write-action="dismiss"][data-request="${pendingEditEntry.request_key}"]').click()`);
+    let afterEditCleanup;
+    for (let i = 0; i < 100; i++) {
+      afterEditCleanup = await evaluate(`new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+        r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      if (!afterEditCleanup.length) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(afterEditCleanup.length, 0, 'product UI did not clear the verified edit request');
+
+    const pausedEnablePromise = armResponseDrop();
+    await evaluate(`document.querySelector('#update-plan-list [data-action="toggle-plan"][data-plan="${planId}"]').click()`);
+    const pausedEnable = await waitForDroppedResponse(pausedEnablePromise);
+    assert.equal(pausedEnable.responseStatusCode, 200, 'server did not accept plan enable');
+    await connection.send('Fetch.failRequest', { requestId: pausedEnable.requestId, errorReason: 'ConnectionReset' });
+    let pendingEnable;
+    for (let i = 0; i < 300; i++) {
+      pendingEnable = await evaluate(`new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+        r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      if (pendingEnable.some(entry => entry.operation === 'update_plan_set_enabled' && entry.phase === 'submitted')) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    const pendingEnableEntry = pendingEnable.find(entry => entry.operation === 'update_plan_set_enabled');
+    assert.equal(pendingEnableEntry?.phase, 'submitted', 'product UI did not retain the enable request');
+    const enableServerPid = serverProcess.pid;
+    await stopServer(serverProcess);
+    await startServer();
+    assert.notEqual(serverProcess.pid, enableServerPid, 'LocalServer was not restarted before enable recovery');
+    await connection.send('Page.reload', { ignoreCache: true });
+    let recoveredEnable;
+    for (let i = 0; i < 300; i++) {
+      recoveredEnable = await evaluate(`(async()=>({ready:document.body.dataset.serverStatus==='verified',entries:
+        await new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+          r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+            get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}}),
+        dismiss:!!document.querySelector('#update-write-journal [data-update-write-action="dismiss"][data-request="${pendingEnableEntry.request_key}"]')}))()`);
+      if (recoveredEnable.ready && recoveredEnable.dismiss) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(recoveredEnable.entries.find(entry => entry.request_key === pendingEnableEntry.request_key)?.phase,
+      'accepted', 'product recovery did not retain the enable receipt');
+    const enabledPlans = await evaluate("fetch('/api/update-plans',{credentials:'same-origin'}).then(response=>response.json())");
+    assert.equal(enabledPlans.plans.find(plan => plan.id === planId).enabled, true, 'plan enable was not persisted');
+    await evaluate(`window.confirm=()=>true;document.querySelector('#update-write-journal [data-update-write-action="dismiss"][data-request="${pendingEnableEntry.request_key}"]').click()`);
+    let afterEnableCleanup;
+    for (let i = 0; i < 100; i++) {
+      afterEnableCleanup = await evaluate(`new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+        r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      if (!afterEnableCleanup.length) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(afterEnableCleanup.length, 0, 'product UI did not clear the verified enable request');
+
+    await evaluate(`document.querySelector('#update-plan-list [data-action="toggle-plan"][data-plan="${planId}"]').click()`);
+    let disabledPlans;
+    for (let i = 0; i < 100; i++) {
+      disabledPlans = await evaluate("fetch('/api/update-plans',{credentials:'same-origin'}).then(response=>response.json())");
+      if (disabledPlans.plans.find(plan => plan.id === planId)?.enabled === false) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(disabledPlans.plans.find(plan => plan.id === planId).enabled, false, 'plan disable was not persisted');
+    assert.equal(postResponses, 4, 'create, edit, enable and disable should each send one POST');
     const version = await (await fetch(`http://127.0.0.1:${devtoolsPort}/json/version`)).json();
     const browserConnection = await connectDevtools(version.webSocketDebuggerUrl);
     browserSocket = browserConnection.socket;
