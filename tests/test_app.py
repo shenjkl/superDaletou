@@ -309,6 +309,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(status, 409)
 
     def test_personally_reviewed_experiment_registration_over_http(self):
+        from dlt.app import Handler
         from test_candidates import config, input_rows
         from test_settlement import fixture
         from dlt.prize_rules import (DLT_2026_HIT_GROUPS, DLT_2026_OFFICIAL_SORT_CODES,
@@ -370,9 +371,60 @@ class AppTests(unittest.TestCase):
                                         headers={'Cookie': self.cookie})
         self.assertEqual((status, json.loads(state)['write']['status']), (200, 'unknown'))
         body['require_intent'] = True
+        response_ready = threading.Event()
+        drop_response = threading.Event()
+        original_json = Handler._json
+        write_error = []
+
+        def lose_committed_experiment_response(handler, response_status, data, **kwargs):
+            if (handler.path == '/api/experiments' and response_status == 200
+                    and data.get('write', {}).get('status') == 'committed'):
+                # The route has returned only after its SQLite transaction committed.
+                response_ready.set()
+                if not drop_response.wait(timeout=10):
+                    raise TimeoutError('test did not release the response drop')
+                handler.connection.close()
+                return
+            return original_json(handler, response_status, data, **kwargs)
+
+        def submit_and_lose_response():
+            try:
+                self.write('/api/experiments', body)
+            except Exception as exc:
+                write_error.append(exc)
+
+        with patch.object(Handler, '_json', lose_committed_experiment_response):
+            submitter = threading.Thread(target=submit_and_lose_response)
+            submitter.start()
+            try:
+                self.assertTrue(response_ready.wait(timeout=10), 'experiment did not reach the committed response')
+                status, _, state = self.request(
+                    'GET', '/api/experiments/write-status?request_key=http-exp&request_sha256='+intent['request_sha256'],
+                    headers={'Cookie': self.cookie})
+                self.assertEqual((status, json.loads(state)['write']['status']), (200, 'committed'))
+                status, _, result = self.request('GET', '/api/experiments?key=http-exp', headers={'Cookie': self.cookie})
+                self.assertEqual(status, 200)
+                self.assertEqual(json.loads(result)['experiment']['content']['protocol']['hypothesis'],
+                                 'synthetic hypothesis')
+                with closing(sqlite3.connect(self.path)) as db:
+                    count = db.execute('SELECT count(*) FROM fixed_experiments WHERE request_key=?',
+                                       ('http-exp',)).fetchone()[0]
+                self.assertEqual(count, 1)
+            finally:
+                drop_response.set()
+                submitter.join(timeout=10)
+            self.assertFalse(submitter.is_alive())
+        self.assertEqual(len(write_error), 1)
+        self.assertIsInstance(write_error[0], (http.client.RemoteDisconnected, ConnectionError, OSError))
+
+        # Replaying the same idempotency key after the lost response returns the original record.
         status, _, result = self.write('/api/experiments', body)
         self.assertEqual(status, 200, result)
         self.assertEqual(json.loads(result)['write']['status'], 'committed')
+        with closing(sqlite3.connect(self.path)) as db:
+            count = db.execute('SELECT count(*) FROM fixed_experiments WHERE request_key=?',
+                               ('http-exp',)).fetchone()[0]
+        self.assertEqual(count, 1)
         status, _, state = self.request('GET', '/api/experiments/write-status?request_key=http-exp&request_sha256='+intent['request_sha256'],
                                         headers={'Cookie': self.cookie})
         self.assertEqual((status, json.loads(state)['write']['status']), (200, 'committed'))
