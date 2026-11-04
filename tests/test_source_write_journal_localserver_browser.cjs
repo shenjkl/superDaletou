@@ -179,7 +179,7 @@ test('real Chrome restores a lost source-review response after LocalServer proce
     await waitForPage(evaluate);
 
     const version = await (await fetch(`http://127.0.0.1:${devtoolsPort}/json/version`)).json();
-    const browserConnection = await connectDevtools(version.webSocketDebuggerUrl);
+    let browserConnection = await connectDevtools(version.webSocketDebuggerUrl);
     browserSocket = browserConnection.socket;
     const { targetId } = await browserConnection.send('Target.createTarget', { url: `${origin}/#prospective` });
     let secondPage;
@@ -445,11 +445,60 @@ test('real Chrome restores a lost source-review response after LocalServer proce
     await stopServer(serverProcess);
     await startServer();
     assert.notEqual(serverProcess.pid, correctionServerPid, 'LocalServer did not restart before correction recovery');
-    await send('Page.reload', { ignoreCache: true });
-    await waitForPage();
+    const firstBrowserPid = chromeProcess.pid;
+    try { secondSocket?.close(); } catch {}
+    try { socket?.close(); } catch {}
+    await browserConnection.send('Browser.close');
+    await new Promise(resolve => {
+      let timer;
+      const done = () => { clearTimeout(timer); resolve(); };
+      timer = setTimeout(() => {
+        if (chromeProcess.exitCode === null && chromeProcess.signalCode === null) chromeProcess.kill();
+        setTimeout(done, 3000);
+      }, 10000);
+      chromeProcess.once('exit', done);
+      if (chromeProcess.exitCode !== null || chromeProcess.signalCode !== null) done();
+    });
+    assert.ok(chromeProcess.exitCode !== null || chromeProcess.signalCode !== null,
+      'Chrome browser process did not exit before persistent profile restart');
+    fs.rmSync(activePortFile, { force: true });
+    chromeProcess = spawn(browser, ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+      '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0',
+      `--user-data-dir=${profile}`, `${origin}/#prospective`], { windowsHide: true, stdio: 'ignore' });
+    let restartedDevtoolsPort;
+    for (let i = 0; i < 300; i++) {
+      if (chromeProcess.exitCode !== null) throw new Error(`Chrome exited before restart DevTools started (${chromeProcess.exitCode})`);
+      if (fs.existsSync(activePortFile)) {
+        restartedDevtoolsPort = Number(fs.readFileSync(activePortFile, 'utf8').split(/\r?\n/)[0]);
+        if (Number.isInteger(restartedDevtoolsPort) && restartedDevtoolsPort > 0) break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    assert.ok(restartedDevtoolsPort, 'restarted Chrome did not expose its DevTools port');
+    const restartedTargets = await (await fetch(`http://127.0.0.1:${restartedDevtoolsPort}/json/list`)).json();
+    const restartedPage = restartedTargets.find(target => target.type === 'page' && target.url.startsWith(origin));
+    assert.ok(restartedPage?.webSocketDebuggerUrl, 'restarted Chrome application page was not found');
+    const restartedConnection = await connectDevtools(restartedPage.webSocketDebuggerUrl);
+    socket = restartedConnection.socket;
+    const sendRestarted = restartedConnection.send;
+    const evaluateRestarted = async expression => {
+      const result = await sendRestarted('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+      if (result.exceptionDetails) throw new Error(result.result?.exception?.description || result.exceptionDetails.text);
+      return result.result.value;
+    };
+    await sendRestarted('Runtime.enable');
+    await evaluateRestarted(`location.hash='#prospective'`);
+    let browserReady = false;
+    for (let i = 0; i < 300; i++) {
+      browserReady = await evaluateRestarted("Boolean(document.querySelector('#review-form') && document.body.dataset.serverStatus==='verified')");
+      if (browserReady) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(browserReady, true, 'new Chrome process did not restore the prospective page and service connection');
+    assert.notEqual(chromeProcess.pid, firstBrowserPid, 'Chrome process was not restarted');
     let recoveredCorrection;
     for (let i = 0; i < 300; i++) {
-      recoveredCorrection = await evaluate(`(async()=>(
+      recoveredCorrection = await evaluateRestarted(`(async()=>(
         {ready:document.body.dataset.serverStatus==='verified',
          entries:await new Promise((resolve,reject)=>{const request=indexedDB.open('dlt-source-write-journal',1);
            request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
@@ -462,19 +511,19 @@ test('real Chrome restores a lost source-review response after LocalServer proce
     const correctionEntry = recoveredCorrection.entries.find(item => item.request_key === pendingCorrection.request_key);
     assert.equal(correctionEntry?.phase, 'accepted', 'product recovery UI did not persist the correction receipt');
     assert.equal(recoveredCorrection.dismiss, true);
-    const correctionState = await evaluate(`fetch('/api/source-write-status?request_key='+encodeURIComponent('${pendingCorrection.request_key}')
+    const correctionState = await evaluateRestarted(`fetch('/api/source-write-status?request_key='+encodeURIComponent('${pendingCorrection.request_key}')
       +'&request_sha256='+encodeURIComponent('${pendingCorrection.request_sha256}'),{credentials:'same-origin'}).then(response=>response.json())`);
     assert.equal(correctionState.write.status, 'accepted');
     assert.equal(correctionState.write.operation, 'source_correction');
-    const corrections = await evaluate("fetch('/api/source-corrections',{credentials:'same-origin'}).then(response=>response.json())");
+    const corrections = await evaluateRestarted("fetch('/api/source-corrections',{credentials:'same-origin'}).then(response=>response.json())");
     const matchingCorrections = corrections.corrections.filter(item => item.seq === correctionState.write.result.correction_id
       && item.old_review_id === originalReview.review_id && item.new_review_id === replacementReview.review_id);
     assert.equal(matchingCorrections.length, 1,
       `server did not retain exactly one correction for the selected sources: ${JSON.stringify({corrections, write:correctionState.write, old:originalReview.review_id, new:replacementReview.review_id})}`);
-    await evaluate(`document.querySelector('#source-write-journal [data-source-write="dismiss"][data-request="${pendingCorrection.request_key}"]').click()`);
+    await evaluateRestarted(`document.querySelector('#source-write-journal [data-source-write="dismiss"][data-request="${pendingCorrection.request_key}"]').click()`);
     let finalJournal;
     for (let i = 0; i < 100; i++) {
-      finalJournal = await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.open('dlt-source-write-journal',1);
+      finalJournal = await evaluateRestarted(`new Promise((resolve,reject)=>{const request=indexedDB.open('dlt-source-write-journal',1);
         request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
           get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
       if (!finalJournal.length) break;
