@@ -308,7 +308,7 @@ class AppTests(unittest.TestCase):
         status, _, _ = self.request('GET', '/api/source-review-document?id='+ident, headers={'Cookie': self.cookie})
         self.assertEqual(status, 409)
 
-    def test_personally_reviewed_experiment_registration_over_http(self):
+    def test_personally_reviewed_experiment_registration_and_fence_race_over_http(self):
         from dlt.app import Handler
         from test_candidates import config, input_rows
         from test_settlement import fixture
@@ -448,6 +448,51 @@ class AppTests(unittest.TestCase):
         status, _, result = self.write('/api/experiments/fence', {'request_key': 'http-pending', 'request_sha256': digest})
         self.assertEqual((status, json.loads(result)['write']['status']), (200, 'fenced'))
         self.assertEqual(self.write('/api/experiments', {**pending, 'require_intent': True})[0], 400)
+
+        # Exercise the same SQLite commit/fence boundary through concurrent HTTP requests.
+        from concurrent.futures import ThreadPoolExecutor
+        racing = {'request_key': 'http-race', 'protocol': {**protocol, 'hypothesis': 'concurrent HTTP test'}}
+        status, _, prepared = self.write('/api/experiments/prepare', racing)
+        self.assertEqual(status, 200, prepared)
+        race_digest = json.loads(prepared)['intent']['request_sha256']
+        race_body = {**racing, 'require_intent': True}
+        start = threading.Barrier(3)
+
+        def race_commit():
+            start.wait()
+            return self.write('/api/experiments', race_body)
+
+        def race_fence():
+            start.wait()
+            return self.write('/api/experiments/fence', {
+                'request_key': 'http-race', 'request_sha256': race_digest})
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            commit_future = pool.submit(race_commit)
+            fence_future = pool.submit(race_fence)
+            start.wait()
+            commit_status, _, commit_payload = commit_future.result(timeout=15)
+            fence_status, _, fence_payload = fence_future.result(timeout=15)
+        self.assertEqual(fence_status, 200, fence_payload)
+        fence_result = json.loads(fence_payload)['write']['status']
+        status, _, race_state = self.request(
+            'GET', '/api/experiments/write-status?request_key=http-race&request_sha256='+race_digest,
+            headers={'Cookie': self.cookie})
+        self.assertEqual(status, 200, race_state)
+        final_state = json.loads(race_state)['write']['status']
+        with closing(sqlite3.connect(self.path)) as db:
+            race_count = db.execute('SELECT count(*) FROM fixed_experiments WHERE request_key=?',
+                                     ('http-race',)).fetchone()[0]
+        if final_state == 'committed':
+            self.assertEqual(commit_status, 200, commit_payload)
+            self.assertEqual(json.loads(commit_payload)['write']['status'], 'committed')
+            self.assertEqual(fence_result, 'committed')
+            self.assertEqual(race_count, 1)
+        else:
+            self.assertEqual(final_state, 'fenced')
+            self.assertEqual(commit_status, 400, commit_payload)
+            self.assertEqual(fence_result, 'fenced')
+            self.assertEqual(race_count, 0)
 
     def test_real_train_over_local_http(self):
         from dlt.models import ALGORITHM_VERSION, FEATURE_SCHEMA_VERSION, PREPROCESSING_VERSION
