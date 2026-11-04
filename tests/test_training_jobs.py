@@ -7,6 +7,7 @@ import time
 import unittest
 
 from dlt.model_repository import ModelRepository
+from dlt.models import ALGORITHM_VERSION, FEATURE_SCHEMA_VERSION, PREPROCESSING_VERSION
 from dlt.snapshots import SnapshotStore
 from dlt.training_jobs import JobError, TrainingJobs
 from dlt.training_boundary import check_holdout_boundary, TrainingBoundaryError
@@ -23,6 +24,9 @@ class TrainingJobTests(unittest.TestCase):
                                                                 '2026-02-01T12:00:00+08:00')['snapshot_id']
         self.config = {'method': 'tree', 'window': 3, 'train_end': '26014', 'cutoff': '26020',
                        'availability_mode': 'historical_reconstruction', 'snapshot_id': self.snapshot, 'seed': 42,
+                       'algorithm_version': ALGORITHM_VERSION['tree'],
+                       'feature_schema_version': FEATURE_SCHEMA_VERSION,
+                       'preprocessing_version': PREPROCESSING_VERSION['tree'],
                        'parameters': {'max_depth': 2, 'min_leaf': 2}}
         self.jobs = TrainingJobs(self.path)
         self.jobs.initialize()
@@ -54,7 +58,8 @@ class TrainingJobTests(unittest.TestCase):
             with self.jobs.lock:
                 if 'job-2' in self.jobs.processes: break
             time.sleep(.02)
-        self.assertEqual(self.jobs.cancel('job-2')['status'], 'cancelled')
+        cancellation = self.jobs.cancel('job-2', 'cancel-job-2')
+        self.assertEqual((cancellation['status'], cancellation['target_status']), ('accepted', 'cancelled'))
         time.sleep(.2)
         self.assertIsNone(self.jobs.get('job-2')['artifact_id'])
 

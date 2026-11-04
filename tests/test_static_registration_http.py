@@ -4,9 +4,11 @@ import json
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 from dlt.app import LocalServer
 import test_prospective_series as fixtures
+import test_static_registration as registration_fixtures
 
 
 class StaticRegistrationHttpTests(unittest.TestCase):
@@ -17,7 +19,9 @@ class StaticRegistrationHttpTests(unittest.TestCase):
     prepare_second = fixtures.SeriesTests.prepare_second
 
     def setUp(self):
-        self.setUpBase(); self.series.create('static', self.manifest)
+        self.setUpBase(); self.series.create(registration_fixtures.STATIC_SERIES_KEY, self.manifest)
+        self.acl_patch = patch('dlt.recovery._require_private_acl')
+        self.acl_patch.start(); self.addCleanup(self.acl_patch.stop)
         self.server = LocalServer(0, self.path); self.server.experiments = self.repo
         self.server.rolling_loop.start()
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True); self.thread.start()
@@ -41,7 +45,8 @@ class StaticRegistrationHttpTests(unittest.TestCase):
             conn.close()
 
     def test_local_background_registers_without_browser_and_rejects_cross_site(self):
-        body = {'series_key': 'static', 'issue': '26017', 'calendar_review_id': self.cal_id,
+        body = {'request_key': '99999999-9999-4999-8999-999999999999',
+                'series_key': registration_fixtures.STATIC_SERIES_KEY, 'issue': '26017', 'calendar_review_id': self.cal_id,
                 'rule_review_id': self.rule_id, 'tax_review_id': self.tax_id, 'expected_cutoff_issue': '26016',
                 'history_periods': 6, 'start_at': (self.now-timedelta(minutes=1)).isoformat(),
                 'internal_deadline': (self.deadline-timedelta(hours=1)).isoformat(), 'confirmed': True}

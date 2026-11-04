@@ -12,6 +12,8 @@ from dlt.snapshots import SnapshotStore
 from dlt.training_jobs import TrainingJobs
 import test_rolling_policy as fixtures
 
+ROLLING_TRAINING_SERIES_KEY = '88888888-8888-4888-8888-888888888888'
+
 
 class RollingTrainingTests(unittest.TestCase):
     setUpBase = fixtures.RollingPolicyTests.setUp
@@ -23,10 +25,10 @@ class RollingTrainingTests(unittest.TestCase):
 
     def setUp(self):
         self.setUpBase()
-        self.series.create('rolling', self.manifest)
+        self.series.create(ROLLING_TRAINING_SERIES_KEY, self.manifest)
         self.scheduler = RollingTraining(self.path, self.jobs, clock=lambda: self.now)
         self.scheduler.initialize()
-        self.args = {'series_key': 'rolling', 'issue': '26017', 'calendar_review_id': self.cal_id,
+        self.args = {'series_key': ROLLING_TRAINING_SERIES_KEY, 'issue': '26017', 'calendar_review_id': self.cal_id,
                      'expected_cutoff_issue': '26016', 'start_at': (self.now-timedelta(minutes=1)).isoformat(),
                      'timeout': 15, 'confirmed': True}
 
@@ -84,7 +86,7 @@ class RollingTrainingTests(unittest.TestCase):
         plan = self.scheduler.create(**self.args)
         with self.assertRaises(RollingPlanError):
             self.scheduler.create(**{**self.args, 'timeout': 10})
-        self.assertEqual(self.scheduler.cancel(plan['id'])['status'], 'cancelled')
+        self.assertEqual(self.scheduler.cancel(plan['id'], request_key='77777777-7777-4777-8777-777777777777')['status'], 'cancelled')
         self.scheduler.tick()
         self.assertIsNone(self.scheduler.list()[0]['job_key'])
 

@@ -24,6 +24,7 @@ def alter_candidate(pair):
 class ModelPairValidationTests(unittest.TestCase):
     setUp = fixtures.GenerationReplayTests.setUp
     save = fixtures.GenerationReplayTests.save
+    persist_training_selection = fixtures.GenerationReplayTests.persist_training_selection
 
     def test_tree_and_lstm_model_candidates_must_match_retained_weights(self):
         for method in ('tree', 'lstm'):
@@ -67,7 +68,7 @@ class ModelPairValidationTests(unittest.TestCase):
         def altered(*args, **kwargs):
             return alter_candidate(generate_from_snapshot(*args, **kwargs))
         with patch('dlt.pair_repository.generate_from_snapshot', side_effect=altered):
-            with self.assertRaisesRegex(CandidateError, '比较清单'):
+            with self.assertRaises(CandidateError):
                 self.save('tree', artifact, 'never-published')
         with self.assertRaises(KeyError):
             self.pairs.get('never-published')

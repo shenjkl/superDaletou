@@ -13,6 +13,10 @@ from dlt.static_registration import StaticRegistration, StaticRegistrationError
 import test_prospective_series as fixtures
 import test_rolling_policy as model_fixtures
 
+STATIC_SERIES_KEY = '11111111-1111-4111-8111-111111111111'
+STATIC_MODEL_SERIES_KEY = '22222222-2222-4222-8222-222222222222'
+STATIC_LSTM_SERIES_KEY = '33333333-3333-4333-8333-333333333333'
+
 
 class StaticRegistrationTests(unittest.TestCase):
     setUp = fixtures.SeriesTests.setUp
@@ -22,9 +26,9 @@ class StaticRegistrationTests(unittest.TestCase):
     prepare_second = fixtures.SeriesTests.prepare_second
 
     def create_plan(self, **changes):
-        self.series.create('static', self.manifest)
+        self.series.create(STATIC_SERIES_KEY, self.manifest)
         self.service = StaticRegistration(self.path, clock=lambda: self.now)
-        args = dict(series_key='static', issue='26017', calendar_review_id=self.cal_id,
+        args = dict(series_key=STATIC_SERIES_KEY, issue='26017', calendar_review_id=self.cal_id,
                     rule_review_id=self.rule_id, tax_review_id=self.tax_id, expected_cutoff_issue='26016',
                     history_periods=6, start_at=(self.now-timedelta(minutes=1)).isoformat(),
                     internal_deadline=(self.deadline-timedelta(hours=1)).isoformat(), confirmed=True)
@@ -113,11 +117,11 @@ class StaticRegistrationTests(unittest.TestCase):
             nonlocal count
             result = original(*args, **kwargs); count += 1
             if count == 2:
-                self.service.cancel(plan['id'])
+                self.service.cancel(plan['id'], request_key='44444444-4444-4444-8444-444444444444')
             return result
         with patch.object(self.service.pairs, 'save_draft', side_effect=cancel_after_second):
             self.service.tick()
-        self.assertEqual(self.service.list()[0]['status'], 'cancelled')
+        self.assertEqual(self.service.list()[0]['status'], 'cancelled', self.service.list()[0]['message'])
         with self.assertRaises(KeyError):
             self.repo.get('static-exp-'+plan['id'])
 
@@ -211,7 +215,7 @@ class StaticRegistrationTests(unittest.TestCase):
                 self.service._advance(plan['id'])
         with self.assertRaises(KeyError):
             self.repo.get('static-exp-'+plan['id'])
-        self.assertEqual(self.series.get('static')['periods'], [])
+        self.assertEqual(self.series.get(STATIC_SERIES_KEY)['periods'], [])
         self.assertEqual(self.service.list()[0]['status'], 'waiting')
         self.service.tick()
         self.assertEqual(self.service.list()[0]['status'], 'complete')
@@ -227,11 +231,12 @@ class StaticRegistrationTests(unittest.TestCase):
         for method in ('hot', 'cold'):
             with self.subTest(method=method):
                 pair_key = method+'-template'
+                series_key = '44444444-4444-4444-8444-' + ('444444444444' if method == 'hot' else '555555555555')
                 pairs.save_draft(pair_key, {**self.config, 'method': method, 'seed': 1},
                                  history_first_issue='26001', history_cutoff_issue='26016')
-                self.series.create(method, {**self.manifest, 'template_pair_key': pair_key})
+                self.series.create(series_key, {**self.manifest, 'template_pair_key': pair_key})
                 service = StaticRegistration(self.path, clock=lambda: self.now)
-                plan = service.create(series_key=method, issue='26017', calendar_review_id=self.cal_id,
+                plan = service.create(series_key=series_key, issue='26017', calendar_review_id=self.cal_id,
                                       rule_review_id=self.rule_id, tax_review_id=self.tax_id,
                                       expected_cutoff_issue='26016', history_periods=6,
                                       start_at=(self.now-timedelta(minutes=1)).isoformat(),
@@ -255,13 +260,13 @@ class StaticModelRegistrationTests(unittest.TestCase):
 
     def test_changed_model_code_or_runtime_blocks_automatic_plan(self):
         self.manifest['retraining_policy'] = 'fixed_artifact_or_untrained_v1'
-        self.series.create('static-model', self.manifest)
+        self.series.create(STATIC_MODEL_SERIES_KEY, self.manifest)
         service = StaticRegistration(self.path, clock=lambda: self.now)
-        args = dict(series_key='static-model', issue='26017', calendar_review_id=self.cal_id,
+        args = dict(series_key=STATIC_MODEL_SERIES_KEY, issue='26017', calendar_review_id=self.cal_id,
                     rule_review_id=self.rule_id, tax_review_id=self.tax_id, expected_cutoff_issue='26016',
                     history_periods=6, start_at=(self.now-timedelta(minutes=1)).isoformat(),
                     internal_deadline=(self.deadline-timedelta(hours=1)).isoformat(), confirmed=True)
-        artifact_id = self.series.get('static-model')['content']['artifact_id']
+        artifact_id = self.series.get(STATIC_MODEL_SERIES_KEY)['content']['artifact_id']
         from dlt.model_repository import ModelRepository
         artifact = ModelRepository(self.path).get(artifact_id)
         for field, value in (('code_sha256', '0'*64), ('runtime', {'python': 'other', 'numpy': 'other'})):
@@ -271,29 +276,37 @@ class StaticModelRegistrationTests(unittest.TestCase):
 
     def test_fixed_tree_artifact_is_used_for_all_replicas(self):
         self.manifest['retraining_policy'] = 'fixed_artifact_or_untrained_v1'
-        self.series.create('static-model', self.manifest)
+        self.series.create(STATIC_MODEL_SERIES_KEY, self.manifest)
         service = StaticRegistration(self.path, clock=lambda: self.now)
-        plan = service.create(series_key='static-model', issue='26017', calendar_review_id=self.cal_id,
+        plan = service.create(series_key=STATIC_MODEL_SERIES_KEY, issue='26017', calendar_review_id=self.cal_id,
                               rule_review_id=self.rule_id, tax_review_id=self.tax_id, expected_cutoff_issue='26016',
                               history_periods=6, start_at=(self.now-timedelta(minutes=1)).isoformat(),
                               internal_deadline=(self.deadline-timedelta(hours=1)).isoformat(), confirmed=True)
         service.tick()
         self.assertEqual(service.list()[0]['status'], 'complete', service.list()[0]['message'])
         fixed = self.repo.get('static-exp-'+plan['id'])
-        expected = self.series.get('static-model')['content']['artifact_id']
+        expected = self.series.get(STATIC_MODEL_SERIES_KEY)['content']['artifact_id']
         self.assertEqual([item['pair']['model_artifact_id'] for item in fixed['pairs']], [expected, expected])
 
     def test_fixed_lstm_artifact_is_used_for_all_replicas(self):
         config = {**self.train_config, 'method': 'lstm',
+                  'algorithm_version': model_fixtures.ALGORITHM_VERSION['lstm'],
+                  'preprocessing_version': model_fixtures.PREPROCESSING_VERSION['lstm'],
                   'parameters': {'hidden_size': 3, 'epochs': 1, 'learning_rate': 0.1}}
         artifact = self.train('static-lstm-model', config, '26001')
-        PairRepository(self.path).save_draft('static-lstm-template', {**self.config, 'method': 'lstm', 'seed': 1},
-                            history_first_issue='26001', history_cutoff_issue='26016', artifact_id=artifact)
+        selection = {'considered_attempts': ['static-lstm-model'], 'selected_attempt': 'static-lstm-model',
+                     'reason': 'single-model fixture selection', 'trial_group_id': None}
+        lstm_pair_config = {**self.config, 'method': 'lstm', 'seed': 1,
+                            'algorithm_version': model_fixtures.ALGORITHM_VERSION['lstm'],
+                            'preprocessing_version': model_fixtures.PREPROCESSING_VERSION['lstm']}
+        PairRepository(self.path).save_draft('static-lstm-template', lstm_pair_config,
+                            history_first_issue='26001', history_cutoff_issue='26016', artifact_id=artifact,
+                            selection=selection)
         manifest = {**self.manifest, 'retraining_policy': 'fixed_artifact_or_untrained_v1',
                     'template_pair_key': 'static-lstm-template'}
-        self.series.create('static-lstm', manifest)
+        self.series.create(STATIC_LSTM_SERIES_KEY, manifest)
         service = StaticRegistration(self.path, clock=lambda: self.now)
-        plan = service.create(series_key='static-lstm', issue='26017', calendar_review_id=self.cal_id,
+        plan = service.create(series_key=STATIC_LSTM_SERIES_KEY, issue='26017', calendar_review_id=self.cal_id,
                               rule_review_id=self.rule_id, tax_review_id=self.tax_id, expected_cutoff_issue='26016',
                               history_periods=6, start_at=(self.now-timedelta(minutes=1)).isoformat(),
                               internal_deadline=(self.deadline-timedelta(hours=1)).isoformat(), confirmed=True)

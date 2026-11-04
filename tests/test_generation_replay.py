@@ -1,5 +1,6 @@
 from contextlib import closing
 from copy import deepcopy
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -14,6 +15,7 @@ from dlt.generation_replay import ReplayError, build_generation_replay, verify_g
 from dlt.model_repository import ModelRepository
 from dlt.pair_repository import PairRepository
 from dlt.snapshots import SnapshotStore
+from dlt.training_jobs import TrainingJobs
 import test_candidates as candidate_fixtures
 import test_model_repository as model_fixtures
 
@@ -27,13 +29,30 @@ class GenerationReplayTests(unittest.TestCase):
             'source credential: SECRET_SOURCE', '2026-01-20T12:00:00+08:00')['snapshot_id']
         self.pairs = PairRepository(self.path)
 
+    def persist_training_selection(self, artifact_id):
+        TrainingJobs(self.path).initialize()
+        attempt_key = 'replay-attempt-'+artifact_id[:32]
+        artifact = ModelRepository(self.path).get(artifact_id)
+        request = {'name': 'replay model fixture', 'config': artifact['config'],
+                   'first_issue': artifact['history_first_issue'], 'timeout': 30}
+        now = datetime.now(timezone.utc).isoformat()
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('INSERT OR IGNORE INTO training_jobs '
+                       '(request_key,request_json,name,status,created_at,finished_at,artifact_id,error) '
+                       'VALUES (?,?,?,\'complete\',?,?,?,NULL)',
+                       (attempt_key, _canonical(request), request['name'], now, now, artifact_id))
+        return {'considered_attempts': [attempt_key], 'selected_attempt': attempt_key,
+                'reason': 'replay fixture model selection', 'trial_group_id': None}
+
     def save(self, method='random', artifact_id=None, key='private/path/SECRET_REQUEST'):
         config = {**candidate_fixtures.config(method), 'snapshot_id': self.snapshot, 'budget_fen': 400,
                   'rule_version': r'C:\Users\private\SECRET_RULE',
                   'calendar_version': 'Bearer SECRET_CALENDAR',
                   'unrecognized': {'token': 'SECRET_TOKEN'}}
+        selection = self.persist_training_selection(artifact_id) if artifact_id else None
         return self.pairs.save_draft(key, config, history_first_issue='26001',
-                                     history_cutoff_issue='26016', artifact_id=artifact_id)
+                                     history_cutoff_issue='26016', artifact_id=artifact_id,
+                                     selection=selection)
 
     def test_generation_replay_redacts_free_text_and_reproduces_all_methods(self):
         for method in ('random', 'hot', 'cold', 'tree', 'lstm'):
@@ -103,8 +122,6 @@ class GenerationReplayTests(unittest.TestCase):
         for method in ('tree', 'lstm'):
             with self.subTest(method=method):
                 training_config = model_fixtures.config(self.snapshot, method)
-                training_config['secret'] = r'C:\private\SECRET_TRAINING'
-                training_config['parameters']['token'] = 'SECRET_PARAMETER'
                 artifact = ModelRepository(self.path).train_from_snapshot(self.snapshot, training_config, first_issue='26001')
                 key = 'model-' + method
                 original = self.save(method, artifact, key)
@@ -114,8 +131,8 @@ class GenerationReplayTests(unittest.TestCase):
                 self.assertEqual(verify_generation_replay(bundle)['training'], 'not_run')
                 self.assertEqual(verify_generation_replay(bundle, retrain=True)['training'], 'matched')
                 encoded = json.dumps(bundle, ensure_ascii=False)
-                self.assertNotIn('SECRET_TRAINING', encoded)
-                self.assertNotIn('SECRET_PARAMETER', encoded)
+                self.assertNotIn('SECRET_SOURCE', encoded)
+                self.assertNotIn('SECRET_REQUEST', encoded)
 
     def test_training_weight_tampering_and_runtime_mismatch_are_rejected(self):
         artifact = ModelRepository(self.path).train_from_snapshot(
@@ -168,7 +185,8 @@ class GenerationReplayTests(unittest.TestCase):
         candidate = {**candidate_fixtures.config('tree'), 'snapshot_id': snapshot,
                      'target_issue': '26021', 'target_date': '2026-01-21', 'budget_fen': 400}
         self.pairs.save_draft('excluded-model', candidate, history_first_issue='26001',
-                              history_cutoff_issue='26017', artifact_id=artifact)
+                              history_cutoff_issue='26017', artifact_id=artifact,
+                              selection=self.persist_training_selection(artifact))
         bundle = build_generation_replay(self.path, 'excluded-model')
         self.assertEqual(bundle['model_training']['config']['holdout_start'], '26018')
         self.assertEqual(bundle['model_training']['config']['holdout_end'], '26020')

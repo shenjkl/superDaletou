@@ -41,7 +41,7 @@ class RollingRegistrationTests(unittest.TestCase):
         self.assertEqual([p['replica'] for p in result['pairs']], ['a', 'b'])
         self.assertEqual([p['pair']['config']['seed'] for p in result['pairs']], [1, 2])
         self.assertEqual(len({p['pair']['model_artifact_id'] for p in result['pairs']}), 1)
-        self.assertEqual(self.series.get('rolling')['periods'][0]['experiment_key'], 'auto-exp-'+plan['id'])
+        self.assertEqual(self.series.get(fixtures.ROLLING_TRAINING_SERIES_KEY)['periods'][0]['experiment_key'], 'auto-exp-'+plan['id'])
         service.tick()
         self.assertEqual(len(service.list()[0]['events']), 2)
         check = check_database(self.path)
@@ -82,7 +82,7 @@ class RollingRegistrationTests(unittest.TestCase):
         with patch.object(service.pairs, 'save_draft', side_effect=pause), ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(service.tick)
             self.assertTrue(started.wait(10))
-            self.assertEqual(service.cancel(plan['id'])['status'], 'cancelled')
+            self.assertEqual(service.cancel(plan['id'], request_key='55555555-5555-4555-8555-555555555555')['status'], 'cancelled')
             release.set(); future.result(timeout=20)
         self.assertEqual(service.list()[0]['status'], 'cancelled')
         with self.assertRaises(KeyError):
@@ -110,7 +110,7 @@ class RollingRegistrationTests(unittest.TestCase):
             result = original(*args, **kwargs)
             count += 1
             if count == 2:
-                service.cancel(plan['id'])
+                service.cancel(plan['id'], request_key='66666666-6666-4666-8666-666666666666')
             return result
         with patch.object(service.pairs, 'save_draft', side_effect=cancel_after_second):
             service.tick()

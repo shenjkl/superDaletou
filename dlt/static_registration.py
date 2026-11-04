@@ -213,7 +213,6 @@ class StaticRegistration:
         if not isinstance(key, str) or not re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}', key, re.I):
             raise StaticRegistrationError('自动登记计划请求标识无效')
 
-    @staticmethod
     def _prior_write(self, db, key, operation, request, retry_of=None):
         row = db.execute('SELECT operation,request_json,result_json FROM static_registration_write_requests WHERE request_key=?', (key,)).fetchone()
         fence = db.execute('SELECT operation,request_json FROM static_registration_write_fences WHERE request_key=?',(key,)).fetchone()
@@ -406,6 +405,13 @@ class StaticRegistration:
                            (_canonical(resolved), self._now().isoformat(), ident))
             series, cal, rule = self._check_sources(db, plan, self._now())
         request = plan['request']; issue = request['issue']; replicas = []
+        selection = None
+        if series['artifact_id']:
+            template_key = series['manifest'].get('template_pair_key')
+            history = self.pairs.selection_history(template_key)
+            if not history:
+                raise StaticRegistrationError('固定模型模板缺少模型选择决策历史')
+            selection = history[-1]['selection']
         for replica in series['manifest']['replica_ids']:
             with closing(sqlite3.connect(self.path)) as db:
                 current = self._get(db, ident)
@@ -418,7 +424,8 @@ class StaticRegistration:
                       'snapshot_id': resolved['snapshot_id'], 'rule_version': rule['version'],
                       'calendar_version': cal['version'], 'seed': series['manifest']['seeds'][issue][replica]}
             self.pairs.save_draft(key, config, history_first_issue=resolved['first_issue'],
-                                  history_cutoff_issue=resolved['cutoff_issue'], artifact_id=series['artifact_id'])
+                                  history_cutoff_issue=resolved['cutoff_issue'], artifact_id=series['artifact_id'],
+                                  selection=selection)
             replicas.append({'replica': replica, 'pair_key': key})
         protocol = {key: series['manifest'][key] for key in SHARED_FIELDS}
         protocol.update(target_issue=issue, replicas=replicas, internal_deadline=request['internal_deadline'],

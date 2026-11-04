@@ -388,6 +388,10 @@ class RollingRegistration:
         job = self.training.jobs.get(training['job_key'])
         if job['status'] != 'complete' or not job.get('artifact_id'):
             raise RollingRegistrationError('训练产物不可用')
+        selection = {'considered_attempts': [training['job_key']],
+                     'selected_attempt': training['job_key'],
+                     'reason': '按固定滚动训练规则采用本期模型',
+                     'trial_group_id': job.get('request', {}).get('trial_group_id')}
         resolved = training['resolved']; request = plan['request']; issue = training['issue']
         replicas = []
         for replica in series['manifest']['replica_ids']:
@@ -401,7 +405,8 @@ class RollingRegistration:
                       'snapshot_id': resolved['config']['snapshot_id'], 'rule_version': rule['version'],
                       'calendar_version': cal['version'], 'seed': series['manifest']['seeds'][issue][replica]}
             self.pairs.save_draft(key, config, history_first_issue=resolved['first_issue'],
-                                  history_cutoff_issue=resolved['config']['cutoff'], artifact_id=job['artifact_id'])
+                                  history_cutoff_issue=resolved['config']['cutoff'], artifact_id=job['artifact_id'],
+                                  selection=selection)
             replicas.append({'replica': replica, 'pair_key': key})
         protocol = {key: series['manifest'][key] for key in SHARED_FIELDS}
         protocol.update(target_issue=issue, replicas=replicas, internal_deadline=request['internal_deadline'],
