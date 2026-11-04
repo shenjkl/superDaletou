@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlsplit
 from dlt.official import SourceError, fetch_page, fetch_page_bounded
 from dlt.pair_repository import PairRepository
 from dlt.prospective_settlement import PaperResults
+from dlt.prize_rules import DLT_2026_OFFICIAL_SORT_CODES
 from dlt.scheduler import ScheduleError, Scheduler
 from test_scheduler import Opener, RAW, configuration
 import test_prospective as fixtures
@@ -44,11 +45,12 @@ class PaginationTests(unittest.TestCase):
         fixtures.ProspectiveTests.setUp(self)
         self.repo.freeze('exp', self.protocol)
         ticket = PairRepository(self.path).get('pair-1')['candidate']['tickets'][0]
+        published_levels = [{'sort': int(code), 'stakeAmount': '6000', 'awardType': 0}
+                            for code in sorted(DLT_2026_OFFICIAL_SORT_CODES)]
         self.draw = {'lotteryGameNum': '85', 'lotteryDrawNum': '26017', 'lotteryDrawTime': self.calendar['draw_date'],
                      'lotteryDrawResult': ' '.join(map(str, ticket['front']+ticket['back'])),
                      'lotteryPromotionFlag': 0, 'verify': 1,
-                     'prizeLevelList': [{'sort': 101, 'stakeAmount': '6000'}, {'sort': 201, 'stakeAmount': '100'},
-                                        {'sort': 301, 'stakeAmount': '5000'}, {'sort': 401, 'stakeAmount': '200'}]}
+                     'prizeLevelList': published_levels}
         self.now = self.deadline + timedelta(days=10)
         self.scheduler = Scheduler(self.path, clock=lambda: self.now)
 

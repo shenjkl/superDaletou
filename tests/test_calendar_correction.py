@@ -65,11 +65,18 @@ class CalendarCorrectionTests(unittest.TestCase):
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('DROP TRIGGER paper_groups_no_update')
             db.execute('DROP TRIGGER paper_publications_no_update')
+            db.execute('DROP TRIGGER paper_events_no_update')
             db.execute('UPDATE paper_groups SET id=?,content_json=? WHERE id=?', (ident, encoded, original['group_id']))
             db.execute('UPDATE paper_current SET group_id=? WHERE experiment_key=?', (ident, 'exp'))
             db.execute('UPDATE paper_publications SET group_id=? WHERE experiment_key=?', (ident, 'exp'))
+            event = db.execute('SELECT experiment_key,snapshot_id,status,recorded_at FROM paper_events '
+                               'WHERE experiment_key=?', ('exp',)).fetchone()
+            event_contents = {'experiment': event[0], 'snapshot': event[1], 'status': event[2], 'reason': ident}
+            db.execute('UPDATE paper_events SET id=?,reason=? WHERE experiment_key=?',
+                       (hashlib.sha256(_canonical(event_contents)).hexdigest(), ident, 'exp'))
             db.execute("CREATE TRIGGER paper_groups_no_update BEFORE UPDATE ON paper_groups BEGIN SELECT RAISE(ABORT, 'immutable paper group'); END")
             db.execute("CREATE TRIGGER paper_publications_no_update BEFORE UPDATE ON paper_publications BEGIN SELECT RAISE(ABORT, 'immutable publication'); END")
+            db.execute("CREATE TRIGGER paper_events_no_update BEFORE UPDATE ON paper_events BEGIN SELECT RAISE(ABORT, 'immutable paper event'); END")
         self.assertEqual(self.paper.inspect_current('exp')['status'], 'locally_attested')
         self.assertEqual(check_database(self.path)['status'], 'passed')
         new_id, correction = self.correction(cutoff=self.deadline+timedelta(minutes=30))

@@ -67,7 +67,7 @@ class ModelPairValidationTests(unittest.TestCase):
         def altered(*args, **kwargs):
             return alter_candidate(generate_from_snapshot(*args, **kwargs))
         with patch('dlt.pair_repository.generate_from_snapshot', side_effect=altered):
-            with self.assertRaisesRegex(CandidateError, '模型候选'):
+            with self.assertRaisesRegex(CandidateError, '比较清单'):
                 self.save('tree', artifact, 'never-published')
         with self.assertRaises(KeyError):
             self.pairs.get('never-published')

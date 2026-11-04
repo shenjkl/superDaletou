@@ -37,6 +37,7 @@ class UpdatePlanEditTests(unittest.TestCase):
     def test_paused_edit_records_versions_and_old_and_new_run_configs(self):
         self.scheduler.set_enabled(self.plan, True)
         first = self.scheduler.claim(self.plan)
+        self.scheduler._record_attempt(first, 1, 'failed', 'fixture')
         self.scheduler._finish(first, 'failed', error='fixture')
         self.scheduler.set_enabled(self.plan, False)
         old = self.current()
@@ -48,6 +49,7 @@ class UpdatePlanEditTests(unittest.TestCase):
         self.scheduler.set_enabled(self.plan, True)
         second = self.scheduler.claim(self.plan)
         self.assertEqual(second['config']['max_pages'], 24)
+        self.scheduler._record_attempt(second, 1, 'failed', 'fixture')
         self.scheduler._finish(second, 'failed', error='fixture')
         runs = {r['id']: r for r in self.scheduler.list_runs(self.plan)}
         self.assertEqual({r['config_status'] for r in runs.values()}, {'recorded'})

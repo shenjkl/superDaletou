@@ -21,7 +21,7 @@ import uuid
 
 import numpy as np
 
-from dlt.backtest import _validate
+from dlt.backtest import BacktestError, _validate
 from dlt.backtest_limits import DEFAULT_BACKTEST_LIMITS
 from dlt.candidates import _canonical
 from dlt.historical_scenarios import backtest_scenarios
@@ -130,7 +130,11 @@ def _environment():
 
 
 def _bounded(protocol):
-    p = _validate(protocol); candidate = p['candidate']
+    try:
+        p = _validate(protocol)
+    except BacktestError as exc:
+        raise EvaluationError(str(exc)) from exc
+    candidate = p['candidate']
     structure = candidate.get('structure'); front = candidate.get('front_count', 5); back = candidate.get('back_count', 2)
     if (structure not in ('singles', 'compound', 'dantuo')
             or (structure == 'compound' and (type(front) is not int or not 5 <= front <= 35

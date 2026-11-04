@@ -221,11 +221,12 @@ class ProspectiveTests(unittest.TestCase):
             self.repo.freeze('exp', {**self.protocol, 'other_winnings_assumption': 'unknown'})
         with self.assertRaisesRegex(RegistrationError, 'distinct replica'):
             self.repo.freeze('exp', {**self.protocol, 'replicas': [self.protocol['replicas'][0]]*2})
-        wrong_rule = fixture()['rule']; wrong_rule['version'] = self.config['rule_version']
+        wrong_rule = complete_current_rule(fixture()['rule'])
+        wrong_rule['version'] = self.config['rule_version']
         wrong_rule['applicable_issues'] = ['26017']; wrong_rule['prices']['base'] = '3'
         wrong_rule['source'] = 'https://www.sporttery.cn/synthetic-test'
         rid = self.review('rule', wrong_rule)
-        with self.assertRaisesRegex(RegistrationError, 'prices do not match'):
+        with self.assertRaisesRegex(RegistrationError, 'ticket prices must match'):
             self.repo.freeze('exp', {**self.protocol, 'rule_review_id': rid})
 
     def test_china_lottery_official_domain_is_allowed_but_lookalikes_are_not(self):

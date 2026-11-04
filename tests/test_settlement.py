@@ -71,7 +71,7 @@ class SettlementTests(unittest.TestCase):
         with self.assertRaisesRegex(SettlementBlocked, 'promotion'):
             settle_portfolio(**args)
         args['rule']['promotion_policy'] = 'included'
-        with self.assertRaisesRegex(SettlementBlocked, 'eligibility rule'):
+        with self.assertRaisesRegex(SettlementBlocked, 'verified 2026 activity issue range'):
             settle_portfolio(**args)
         args = fixture()
         args['draw']['issue'] = '26125'

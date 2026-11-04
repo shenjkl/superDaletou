@@ -48,7 +48,8 @@ class BacktestJobTests(unittest.TestCase):
     def test_cancel_and_restart_never_publish_report(self):
         self.jobs.worker_command = [sys.executable, '-c', 'import time; time.sleep(5)']
         self.jobs.submit('cancelled', self.cfg, 30)
-        self.assertEqual(self.jobs.cancel('cancelled')['status'], 'cancelled')
+        cancellation = self.jobs.cancel('cancelled', 'cancel-request-1')
+        self.assertEqual((cancellation['status'], cancellation['target_status']), ('accepted', 'cancelled'))
         time.sleep(.2)
         self.assertEqual(self.jobs.get('cancelled')['status'], 'cancelled')
         with self.assertRaises(KeyError):

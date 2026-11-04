@@ -10,7 +10,8 @@ import unittest
 from unittest.mock import patch
 
 from dlt.model_repository import ModelRepository
-from dlt.models import TrainingError, predict, train
+from dlt.models import (ALGORITHM_VERSION, FEATURE_SCHEMA_VERSION, PREPROCESSING_VERSION,
+                        TrainingError, predict, train)
 from dlt.models import _canonical
 from dlt.snapshots import SnapshotStore
 
@@ -29,6 +30,9 @@ def payload(count=16):
 def config(snapshot_id, method='tree'):
     return {'method': method, 'window': 3, 'train_end': '26012', 'cutoff': '26016',
             'availability_mode': 'historical_reconstruction', 'snapshot_id': snapshot_id, 'seed': 42,
+            'algorithm_version': ALGORITHM_VERSION[method],
+            'feature_schema_version': FEATURE_SCHEMA_VERSION,
+            'preprocessing_version': PREPROCESSING_VERSION[method],
             'parameters': {'max_depth': 2, 'min_leaf': 2} if method == 'tree'
             else {'hidden_size': 3, 'epochs': 2, 'learning_rate': 0.1}}
 

@@ -1087,7 +1087,13 @@ def check_database(path):
                        for row in columns if row[1] in expected_types):
                     errors.append({'area': 'schema', 'reason': 'recovery metadata column type differs'})
                 actual_not_null = {row[1] for row in columns if row[3] or row[5]}
-                if not TABLE_NOT_NULL_COLUMNS.get(table, frozenset()) <= actual_not_null:
+                missing_not_null = TABLE_NOT_NULL_COLUMNS.get(table, frozenset()) - actual_not_null
+                if table == 'observations' and missing_not_null == frozenset(('raw_payload',)):
+                    # Older databases may have acquired raw_payload through a
+                    # nullable ALTER TABLE. Keep them explicitly incomplete;
+                    # the missing original bytes cannot support full replay.
+                    limitations.append('legacy observation schema permits missing original bytes')
+                elif missing_not_null:
                     errors.append({'area': 'schema', 'reason': 'required column nullability differs'})
                 expected_defaults = TABLE_COLUMN_DEFAULTS.get(table, {})
                 actual_defaults = {row[1]: row[4] for row in columns if row[1] in expected_defaults}
@@ -1840,6 +1846,7 @@ def check_database(path):
 
             def check_update_run(row):
                 ident, plan_id, token, due_at, started_at, lease_until, status, ended_at, snapshot_id, error = row
+                from dlt.scheduler import _parse
                 _require(isinstance(ident, str) and bool(ident)
                          and db.execute('SELECT 1 FROM update_plans WHERE id=?', (plan_id,)).fetchone())
                 _require(isinstance(token, str) and bool(token))
@@ -2591,8 +2598,9 @@ def check_database(path):
                          and set(request) == {'protocol', 'scenarios'}
                          and report.get('protocol') == request.get('protocol')
                          and report.get('scenarios') == request.get('scenarios'))
-                job = db.execute('SELECT request_json,status FROM backtest_jobs WHERE request_key=?',
-                                 (request_key,)).fetchone()
+                job = (db.execute('SELECT request_json,status FROM backtest_jobs WHERE request_key=?',
+                                  (request_key,)).fetchone()
+                       if 'backtest_jobs' in tables else None)
                 if job:
                     job_request = json.loads(job[0])
                     _require(job[1] == 'complete' and job_request.get('protocol') == report['protocol'])
@@ -3023,8 +3031,12 @@ def check_database(path):
                 observation = db.execute('SELECT raw_sha256,raw_payload FROM observations '
                                          'WHERE snapshot_id=? AND source=? AND observed_at=?',
                                          (obj['source_snapshot_id'], source, obj['observed_at'])).fetchone()
-                _require(observation and isinstance(observation[1], bytes)
-                         and _sha(observation[1]) == observation[0])
+                _require(observation)
+                if observation[1] is None:
+                    if 'one or more historical observations lack original bytes' not in limitations:
+                        limitations.append('one or more historical observations lack original bytes')
+                    return
+                _require(isinstance(observation[1], bytes) and _sha(observation[1]) == observation[0])
                 observed_payload, observed_rows = parse_snapshot(observation[1])
                 _require(_sha(_canonical(observed_payload)) == obj['source_snapshot_id'])
                 matching_rows = [item for item in observed_rows if item['issue'] == issue]

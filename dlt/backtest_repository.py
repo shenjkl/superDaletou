@@ -58,8 +58,12 @@ def _recheck_settlements(db, report, *, rebuild=False):
                     or json.loads(source_row[2]) != original['back']
                     or period['target']['date'] != original['draw_date']):
                 raise BacktestError('historical draw differs from retained snapshot')
+            scenario = scenarios.get(issue)
+            if scenario is None:
+                # Preserve periods that were explicitly retained as incomplete
+                # because their historical payout protocol was unavailable.
+                continue
             promotion, published_promotion_payouts = promotion_data(original['raw_row'], issue)
-            scenario = scenarios[issue]
             if scenario.get('promotion') is not promotion:
                 raise BacktestError('派奖场景与留存开奖标记不一致')
             expected_payouts = published_payouts(original['raw_row'], scenario.get('rule'),

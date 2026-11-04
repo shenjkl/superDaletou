@@ -8,34 +8,52 @@ from unittest.mock import patch
 
 from dlt.backtest import BacktestError, run_from_snapshot
 from dlt.candidates import CandidateError
+from dlt.models import ALGORITHM_VERSION, FEATURE_SCHEMA_VERSION, PREPROCESSING_VERSION
+from dlt.prize_rules import (DLT_2026_ADDITIONAL_GROUPS, DLT_2026_HIT_GROUPS,
+                             DLT_2026_OFFICIAL_SORT_CODES)
 from dlt.snapshots import SnapshotStore
 from test_candidates import config, input_rows
 from test_settlement import fixture
 
 
 def source_data():
+    prize_levels = [{'sort': code, 'stakeAmount': '6000', 'awardType': 0}
+                    for code in sorted(DLT_2026_OFFICIAL_SORT_CODES)]
     return {'success': True, 'errorCode': '0', 'value': {'list': [
         {'lotteryGameNum': '85', 'lotteryDrawNum': row['issue'], 'lotteryDrawTime': row['date'],
-         'lotteryDrawResult': ' '.join(map(str, row['front']+row['back'])), 'prizeLevelList': []}
+         'lotteryDrawResult': ' '.join(map(str, row['front']+row['back'])),
+         'lotteryPromotionFlag': 0, 'prizeLevelList': prize_levels}
         for row in input_rows(20)]}}
 
 
 def scenarios(issues):
     result = {}
     for issue in issues:
-        source = fixture(); source['rule']['applicable_issues'] = [issue]
+        source = fixture()
+        rule = source['rule']
+        rule.update(version='synthetic-dlt-2026-v1', applicable_issues=[issue],
+                    payout_sort_map={code: code for code in sorted(DLT_2026_OFFICIAL_SORT_CODES)},
+                    hit_groups={outcome: (str(rank) if rank is not None else None)
+                                for outcome, rank in DLT_2026_HIT_GROUPS.items()},
+                    additional_groups={str(base): str(extra)
+                                       for base, extra in DLT_2026_ADDITIONAL_GROUPS.items()})
+        payouts = {group: '6000' for group in set(rule['hit_groups'].values()) if group is not None}
         result[issue] = {'source_ref': 'synthetic fixture', 'promotion': False,
-                         'rule': source['rule'], 'payouts': source['payouts']}
+                         'rule': rule, 'payouts': payouts}
     return result
 
 
 def protocol(snapshot, method='hot'):
-    candidate = {**config(method), 'budget_fen': 400}
+    candidate = {**config(method), 'budget_fen': 400, 'base_price_fen': 200,
+                 'additional_price_fen': 300, 'additional': False, 'max_tickets': 100}
     return {'mode': 'historical_reconstruction', 'analysis': 'descriptive', 'aggregation': 'arithmetic_mean_v1',
             'selection_role': 'exploration', 'snapshot_id': snapshot, 'targets': ['26018', '26019', '26020'],
             'replicas': ['a', 'b', 'c'], 'seed': 42, 'history_periods': 12,
             'limits': {'max_targets': 10, 'max_replicas': 10, 'max_history': 20}, 'candidate': candidate,
             'model': {'window': 3, 'validation_periods': 2,
+                      'algorithm_version': ALGORITHM_VERSION.get(method),
+                      'feature_schema_version': FEATURE_SCHEMA_VERSION,
+                      'preprocessing_version': PREPROCESSING_VERSION.get(method),
                       'parameters': {'max_depth': 2, 'min_leaf': 2} if method == 'tree' else
                                     {'hidden_size': 3, 'epochs': 1, 'learning_rate': 0.1}}}
 
@@ -122,7 +140,7 @@ class BacktestTests(unittest.TestCase):
                 run_from_snapshot(self.path, cfg, scenarios(cfg['targets']))
             read.assert_not_called()
 
-    def test_existing_historical_snapshot_with_synthetic_payouts(self):
+    def test_existing_historical_snapshot_rejects_synthetic_payouts(self):
         path = Path(self.tmp.name)/'historical.sqlite3'
         raw = (Path(__file__).resolve().parents[1]/'research/data/official_page1.json').read_bytes()
         sid = SnapshotStore(path).import_official(raw, 'existing local snapshot',
@@ -131,7 +149,9 @@ class BacktestTests(unittest.TestCase):
         targets = [row['issue'] for row in rows[-3:]]
         cfg = {**protocol(sid, 'tree'), 'targets': targets, 'replicas': ['a', 'b']}
         result = run_from_snapshot(path, cfg, scenarios(targets))
-        self.assertEqual((result['planned_periods'], result['complete_periods']), (3, 3))
+        self.assertEqual((result['planned_periods'], result['complete_periods']), (3, 0))
+        self.assertIn('payout scenario differs from retained draw fields',
+                      result['periods'][0]['replicas'][0]['reason'])
         self.assertEqual(result['evidence'], 'descriptive reconstruction only; source and holdout independence not verified')
 
 

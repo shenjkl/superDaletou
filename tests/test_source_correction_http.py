@@ -1,12 +1,16 @@
 from copy import deepcopy
 import http.client
+import hashlib
 import json
 import threading
 import unittest
+import uuid
 from unittest.mock import patch
 
 from dlt.app import LocalServer
 from dlt.scheduler import Scheduler
+from dlt.candidates import _canonical
+from dlt.source_write_protocol import digest as source_write_digest
 import test_prospective_settlement as fixtures
 from test_prospective import swap_first_second_prize_codes
 
@@ -46,8 +50,10 @@ class SourceCorrectionHttpTests(unittest.TestCase):
         corrected['version'] = 'corrected-http-v2'
         corrected = swap_first_second_prize_codes(corrected)
         new_id = self.review('rule', corrected)
-        return {'old_review_id': self.rule_id, 'new_review_id': new_id,
-                'note': 'synthetic correction only', 'confirmed': True}
+        request = {'old_review_id': self.rule_id, 'new_review_id': new_id, 'issue': None,
+                   'note': 'synthetic correction only', 'confirmed': True}
+        return {**request, 'request_key': str(uuid.uuid4()),
+                'request_sha256': source_write_digest(request)}
 
     def test_http_correction_invalidates_recalculates_and_retries_idempotently(self):
         sid = self.import_draw(self.draw)
@@ -69,13 +75,17 @@ class SourceCorrectionHttpTests(unittest.TestCase):
             self.assertEqual(old['superseded_by'], body['new_review_id'])
             _, _, history = request('GET', '/api/experiment-history?key=exp', headers=read)
             self.assertEqual([p['group_id'] for p in history['history']['publications']], [original['group_id'], replacement])
-            status, _, retried = request('POST', '/api/source-corrections/retry',
-                                         json.dumps({'correction_id': correction_id}), write)
+            retry_request = {'correction_id': correction_id, 'scope': 'global'}
+            status, _, retried = request('POST', '/api/source-corrections/retry', json.dumps({
+                **retry_request, 'request_key': str(uuid.uuid4()),
+                'request_sha256': hashlib.sha256(_canonical(retry_request)).hexdigest()}), write)
             self.assertEqual(status, 200)
             self.assertEqual(retried['followup']['details']['exp']['group_id'], replacement)
             _, _, history = request('GET', '/api/experiment-history?key=exp', headers=read)
             self.assertEqual(len(history['history']['publications']), 2)
-            self.assertEqual(request('POST', '/api/source-corrections', json.dumps(body), write)[0], 400)
+            status, _, duplicate = request('POST', '/api/source-corrections', json.dumps(body), write)
+            self.assertEqual(status, 200, duplicate)
+            self.assertEqual(duplicate['correction']['correction_id'], correction_id)
 
     def test_committed_correction_recovers_if_immediate_dispatch_fails(self):
         sid = self.import_draw(self.draw)

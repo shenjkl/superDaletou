@@ -7,7 +7,8 @@ import unittest
 
 import numpy as np
 
-from dlt.models import TrainingError, _lstm_loss_grad, _weights_init, predict, prepare_samples, train
+from dlt.models import (ALGORITHM_VERSION, FEATURE_SCHEMA_VERSION, PREPROCESSING_VERSION,
+                        TrainingError, _lstm_loss_grad, _weights_init, predict, prepare_samples, train)
 from dlt.snapshots import parse_snapshot
 
 
@@ -25,6 +26,9 @@ def rows(count=16):
 def config(method):
     return {'method': method, 'window': 3, 'train_end': '26012', 'cutoff': '26016',
             'availability_mode': 'historical_reconstruction', 'snapshot_id': 'a'*64, 'seed': 42,
+            'algorithm_version': ALGORITHM_VERSION[method],
+            'feature_schema_version': FEATURE_SCHEMA_VERSION,
+            'preprocessing_version': PREPROCESSING_VERSION[method],
             'parameters': {'max_depth': 2, 'min_leaf': 2} if method == 'tree'
             else {'hidden_size': 3, 'epochs': 2, 'learning_rate': 0.1}}
 
@@ -123,6 +127,9 @@ class ModelTests(unittest.TestCase):
             cfg = {'method': method, 'window': 5, 'train_end': history[-11]['issue'],
                    'cutoff': history[-1]['issue'], 'availability_mode': 'historical_reconstruction',
                    'snapshot_id': source_id, 'seed': 42,
+                   'algorithm_version': ALGORITHM_VERSION[method],
+                   'feature_schema_version': FEATURE_SCHEMA_VERSION,
+                   'preprocessing_version': PREPROCESSING_VERSION[method],
                    'parameters': {'max_depth': 2, 'min_leaf': 2} if method == 'tree'
                    else {'hidden_size': 3, 'epochs': 1, 'learning_rate': 0.1}}
             with self.subTest(method=method):

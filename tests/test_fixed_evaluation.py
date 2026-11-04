@@ -151,7 +151,8 @@ class FixedEvaluationTests(unittest.TestCase):
             root = Path(directory).resolve()
             self.assertTrue(root.is_relative_to(workspace))
             isolated = root / 'with-correction-copy.sqlite3'
-            self.assertEqual(prepare_isolated_copy(self.path, isolated)['status'], 'prepared')
+            with patch('dlt.recovery._require_private_acl'):
+                self.assertEqual(prepare_isolated_copy(self.path, isolated)['status'], 'prepared')
             isolated_service = FixedEvaluations(isolated)
             try:
                 self.assertEqual(isolated_service.get(self.reservation)['correction']['id'], corrected['correction']['id'])
@@ -207,11 +208,16 @@ class FixedEvaluationTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT count(*) FROM fixed_evaluation_corrections').fetchone()[0], 0)
 
     def test_amount_correction_route_enforces_session_and_origin_without_socket(self):
-        from dlt.app import Handler
+        from dlt.app import Handler, _fixed_evaluation_write_digest
+        import uuid
         calls = []
-        fake = SimpleNamespace(recalculate_amounts=lambda reservation: calls.append(reservation) or {'validity': 'local_descriptive'})
+        fake = SimpleNamespace(recalculate_amounts=lambda reservation, **kwargs: calls.append(reservation) or {'validity': 'local_descriptive'},
+                               write_status=lambda *args: {'status': 'accepted'})
         def call(*, csrf='secret', origin='http://127.0.0.1:8766'):
-            raw = json.dumps({'reservation_id': 'reservation-id'}).encode()
+            request = {'reservation_id': 'a'*64}
+            body = {**request, 'request_key': str(uuid.uuid4()),
+                    'request_sha256': _fixed_evaluation_write_digest('recalculate_amounts', request)}
+            raw = json.dumps(body).encode()
             handler = object.__new__(Handler)
             handler.server = SimpleNamespace(origin='http://127.0.0.1:8766', csrf='secret', fixed_evaluations=fake)
             handler.path = '/api/fixed-evaluations/recalculate-amounts'
@@ -226,7 +232,7 @@ class FixedEvaluationTests(unittest.TestCase):
         self.assertEqual(call(csrf='wrong')[0], 403)
         self.assertEqual(call(origin='https://invalid.example')[0], 403)
         self.assertEqual(call()[0], 200)
-        self.assertEqual(calls, ['reservation-id'])
+        self.assertEqual(calls, ['a'*64])
 
     def test_requires_same_budget_replica_manifest_and_exact_range(self):
         for mutate in ('cost', 'replica', 'range', 'structure'):
@@ -342,7 +348,7 @@ class FixedEvaluationTests(unittest.TestCase):
         self.assertEqual(failed['status'], 'failed')
         repeated = self.service.start(self.reservation, request_key='first-run')
         self.assertEqual(repeated['requested_attempt']['status'], 'failed')
-        with self.assertRaisesRegex(EvaluationError, '不同的评估或操作'):
+        with self.assertRaisesRegex(EvaluationError, '不同'):
             self.service.start(self.reservation, request_key='first-run', retry=True)
         for _ in range(50):
             with self.service.lock:
