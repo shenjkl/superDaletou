@@ -98,3 +98,27 @@ test('late response from an earlier page generation is discarded', async () => {
   assert.equal(c.overviewState.data,null);
   assert.match(c.root.innerHTML,/已离开/);
 });
+
+test('late response from an old connection cannot replace verified data after reconnection', async()=>{
+  const c=makeContext(),old=input(),fresh=input();let releaseOld;
+  old.experiments=[{request_key:'old',target_issue:'26018',target_date:'2026-02-01',hypothesis:'旧连接结果',replicas:1,status:'locally_attested',paper_status:'waiting'}];
+  fresh.experiments=[{request_key:'new',target_issue:'26019',target_date:'2026-02-02',hypothesis:'重连后新结果',replicas:1,status:'locally_attested',paper_status:'waiting'}];
+  const oldExperiments=new Promise(resolve=>{releaseOld=resolve;});
+  const response=(url,data)=>({ok:true,json:async()=>url.startsWith('/api/update-plans')?{plans:data.plans,worker:data.worker}:
+    url.startsWith('/api/experiments')?{experiments:data.experiments}:url.startsWith('/api/experiment-series')?{series:data.series}:data.detail});
+  c.fetch=async url=>url.startsWith('/api/experiments')?oldExperiments:response(url,old);
+  const oldRefresh=c.refreshOverview(old.snapshots,old.jobs);
+  c.connectionEpoch++;
+  c.invalidateOverview('连接已断开，旧状态已清除');
+  c.backend.ready=true;
+  c.fetch=async url=>response(url,fresh);
+  await c.refreshOverview(fresh.snapshots,fresh.jobs);
+  assert.equal(c.overviewState.data.experiments[0].hypothesis,'重连后新结果');
+  assert.match(c.root.innerHTML,/重连后新结果/);
+
+  releaseOld({ok:true,json:async()=>({experiments:old.experiments})});
+  await oldRefresh;
+  assert.equal(c.overviewState.data.experiments[0].hypothesis,'重连后新结果');
+  assert.match(c.root.innerHTML,/重连后新结果/);
+  assert.doesNotMatch(c.root.innerHTML,/旧连接结果/);
+});
