@@ -14,6 +14,7 @@ from unittest.mock import patch
 from dlt.app import LocalServer, SingleInstance
 from dlt.snapshots import SnapshotStore
 from dlt.pair_repository import PairRepository
+from test_candidates import config
 
 
 class AppTests(unittest.TestCase):
@@ -52,6 +53,42 @@ class AppTests(unittest.TestCase):
                 'Content-Type': 'application/json'}
         base.update(headers or {})
         return self.request('POST', path, body=json.dumps(value).encode(), headers=base)
+
+    def test_s01_candidate_evaluation_comparison_over_local_http(self):
+        raw = (Path(__file__).resolve().parents[1] / 'research/data/official_page1.json').read_bytes()
+        snapshot = SnapshotStore(self.path).import_official(
+            raw, 'S01 local HTTP fixture', '2026-10-29T12:00:00+08:00')['snapshot_id']
+        draws = SnapshotStore(self.path).get_draws(snapshot)
+        pairs = PairRepository(self.path)
+        for key, budget in (('pair-one', 400), ('pair-two', 600)):
+            pairs.save_draft(key, {**config(), 'snapshot_id': snapshot, 'target_issue': '26124',
+                                   'target_date': '2026-10-31', 'budget_fen': budget},
+                             history_first_issue=draws[0]['issue'], history_cutoff_issue=draws[-1]['issue'])
+
+        for request_key, pair_key in (('evaluation-one', 'pair-one'), ('evaluation-two', 'pair-two')):
+            status, _, payload = self.write('/api/evaluations', {
+                'request_key': request_key, 'pair_key': pair_key, 'scenario_snapshot_id': snapshot,
+                'scenario_issue': '26123', 'samples': 1000, 'seed': 7})
+            self.assertEqual(status, 200, payload)
+            self.assertEqual(json.loads(payload)['status'], 'research_draft')
+
+        status, _, payload = self.request('GET', '/api/evaluations/comparison-options',
+                                          headers={'Cookie': self.cookie})
+        self.assertEqual(status, 200, payload)
+        options = json.loads(payload)['options']
+        self.assertEqual({item['request_key'] for item in options}, {'evaluation-one', 'evaluation-two'})
+
+        status, _, payload = self.request('GET',
+            '/api/evaluations/compare?key=evaluation-one&key=evaluation-two',
+            headers={'Cookie': self.cookie})
+        self.assertEqual(status, 200, payload)
+        comparison = json.loads(payload)
+        self.assertEqual([item['pair_key'] for item in comparison['entries']], ['pair-one', 'pair-two'])
+        self.assertEqual([item['pair']['candidate']['cost_fen'] for item in comparison['entries']], [400, 600])
+        self.assertEqual([item['result']['scenario']['source_issue'] for item in comparison['entries']],
+                         ['26123', '26123'])
+        self.assertIn('not an adoption recommendation', comparison['assurance'])
+        self.assertEqual(self.request('GET', '/api/evaluations/comparison-options')[0], 401)
 
     def test_origin_csrf_cookie_host_and_static_whitelist(self):
         self.assertEqual(self.write('/api/snapshots/import-bundled', {}, {'Origin': 'https://attacker.invalid'})[0], 403)
