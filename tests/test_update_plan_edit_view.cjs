@@ -19,6 +19,10 @@ const c = {backend: {plans: []},
   FormData: class {constructor(form) {this.values = form.values;} get(key) {return this.values[key];}},
   refreshBackend: async () => {}, toast: text => notices.push(text)};
 vm.runInNewContext(source.slice(listStart, formEnd), c);
+c.submitUpdateWrite=async(operation,request)=>{
+  const result=await c.backendPost('/api/update-plans/edit',request);
+  return {accepted:true,entry:{result}};
+};
 
 test('paused plan offers an inline editor and displays its retained history', () => {
   c.backend.plans = [{id: 'plan', enabled: false, config_sha256: 'a'.repeat(64), next_due: 'later',

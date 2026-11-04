@@ -11,10 +11,17 @@ assert.ok(start >= 0 && end > start);
 const target = {innerHTML: ''};
 let notices = [];
 const context = {backend: {ready: true, autostart: null},
+  location: {port: '8000'},
   escape: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'),
   el: id => id === 'autostart-controls' ? target : null,
   toast: message => notices.push(message)};
 vm.runInNewContext(source.slice(start, end), context);
+context.refreshBackend = async () => {context.backend.autostart = null;};
+context.submitUpdateWrite = async (_operation, request) => {
+  const result = await context.backendPost('/api/autostart', {enabled:request.enabled});
+  context.backend.autostart = result.autostart;
+  return {accepted:true};
+};
 
 test('disabled, enabled, conflict and missing program states are clear', () => {
   context.backend.autostart = {state: 'disabled', can_enable: true};
@@ -45,5 +52,5 @@ test('toggle applies returned state and errors clear stale status', async () => 
   await context.toggleAutostart(false);
   assert.equal(context.backend.autostart, null);
   assert.match(target.innerHTML, /连接本机服务/);
-  assert.match(notices[1], /未保存/);
+  assert.match(notices[1], /结果待确认/);
 });

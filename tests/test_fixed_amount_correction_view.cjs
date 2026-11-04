@@ -19,6 +19,12 @@ function context() {
     backendPost: async (url, body) => {calls.push({url, body}); return {};},
     refreshReservations: async () => {calls.push('refresh');}, toast: message => notices.push(message)};
   vm.runInNewContext(source.slice(renderStart, renderEnd) + '\n' + source.slice(actionStart, actionEnd), c);
+  c.runFixedEvaluationWrite=async(_operation,request,success)=>{
+    await c.backendPost('/api/fixed-evaluations/recalculate-amounts',request);
+    await c.refreshReservations();
+    c.toast(success);
+    return {phase:'accepted'};
+  };
   return {c, calls, notices};
 }
 

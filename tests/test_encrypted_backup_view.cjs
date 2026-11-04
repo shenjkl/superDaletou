@@ -14,7 +14,7 @@ function setup() {
   const status = {textContent:''}, button = {disabled:false};
   const form = {dataset:{},isConnected:true,querySelector:()=>button,reset(){values.password='';values.password_repeat='';values.acknowledge=null;}};
   const link = {click(){this.clicked=true;},remove(){}};
-  const c = {tag:x=>x,backend:{csrf:'csrf-secret',ready:true},el:id=>id==='encrypted-backup-status'?status:null,
+  const c = {tag:x=>x,backend:{csrf:'csrf-secret',ready:true},connectionEpoch:0,state:{page:'data'},el:id=>id==='encrypted-backup-status'?status:null,
     FormData:class {get(key){return values[key];}},
     document:{addEventListener(){},createElement:()=>link,body:{dataset:{},append(){}}},
     URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},setTimeout(){}};
@@ -26,7 +26,7 @@ test('backup form describes original data, passphrase and incomplete recovery',(
   const {c}=setup(), html=c.encryptedBackupPanel();
   assert.match(html,/不是脱敏导出/);
   assert.match(html,/口令遗失后无法恢复/);
-  assert.match(html,/完整恢复和页面解密功能尚未完成/);
+  assert.match(html,/完整恢复验收尚未完成/);
   assert.match(html,/type="password"/);
 });
 

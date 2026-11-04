@@ -50,7 +50,7 @@ test('plan setup explains resumed search and the minimum useful page budget', ()
   const startForm = source.indexOf('function updatePlans()');
   const endForm = source.indexOf('\nfunction updateWorkerStatus()', startForm);
   assert.ok(startForm >= 0 && endForm > startForm);
-  const context = {tag: text => text, updateWorkerStatus: () => '', updatePlanList: () => '', autostartControls: () => ''};
+  const context = {UPDATE_PLAN_TIMEOUT_SECONDS:[1,120],tag: text => text, updateWorkerStatus: () => '', updatePlanList: () => '', autostartControls: () => ''};
   vm.runInNewContext(source.slice(startForm, endForm) + '\nresult=updatePlans();', context);
   assert.match(context.result, /下次先核对末页/);
   assert.match(context.result, /至少设置 3 页/);

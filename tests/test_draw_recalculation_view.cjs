@@ -16,7 +16,10 @@ function setup() {
   const c = {drawReviewSequence: 3, activeDrawReview: {issue: '26017'},
     escape: v => String(v).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;'),
     tag: text => text, el: id => id === 'draw-review-outcomes' ? target : null,
-    backendPost: async (url, body) => {calls.push({url, body}); return {recalculations: {exp: {status: 'complete'}}};},
+    getPaperWriteJournal: () => ({
+      begin: async (_operation, request) => {calls.push({url:'/api/paper-results/recalculate-issue', body:request}); return {phase:'accepted'};},
+      result: async () => ({recalculations: {exp: {status: 'complete'}}}),
+    }),
     refreshBackend: async () => {}, toast: () => {}, reviewError: text => text,
   };
   vm.runInNewContext(source.slice(start, end), c);

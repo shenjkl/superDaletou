@@ -67,7 +67,8 @@ test('stale protocol without an eligible successor does not offer unsafe actions
 test('successor submit sends explicit confirmation and refreshes the linked version', async () => {
   const calls = [], notices = [], button = {disabled: false, isConnected: true};
   const form = {dataset: {reservation: 'old-id'}, querySelector: () => button};
-  const context = {FormData: class {get(key) {return key === 'reason' ? '  upgrade  ' : 'on';}},
+  const context = {FormData: class {constructor(){this.data=[['reason','  upgrade  '],['confirm','on']];} get(key) {return key === 'reason' ? '  upgrade  ' : 'on';} entries(){return this.data[Symbol.iterator]();}},
+    runFixedEvaluationWrite:async(_op,body)=>{calls.push({url:'/api/fixed-evaluations/supersede',body});return {phase:'accepted'};},
     backendPost: async (url, body) => {calls.push({url, body}); return {reservation: {id: 'new-id'}};},
     refreshReservations: async () => calls.push('refresh'), toast: text => notices.push(text), el: () => null};
   vm.runInNewContext(submitter, context);
@@ -84,7 +85,8 @@ test('successor submit sends explicit confirmation and refreshes the linked vers
 test('successor submit shows server rejection and re-enables the action', async () => {
   const error = {textContent: ''}, button = {disabled: false, isConnected: true};
   const form = {dataset: {reservation: 'old-id'}, querySelector: () => button};
-  const context = {FormData: class {get(key) {return key === 'reason' ? 'upgrade' : 'on';}},
+  const context = {FormData: class {constructor(){this.data=[['reason','upgrade'],['confirm','on']];} get(key) {return key === 'reason' ? 'upgrade' : 'on';} entries(){return this.data[Symbol.iterator]();}},
+    runFixedEvaluationWrite:async()=>{throw Error('已有运行记录');},
     backendPost: async () => {throw Error('已有运行记录');}, refreshReservations: async () => {throw Error('unexpected refresh');},
     toast: () => {}, el: id => id === 'supersede-fixed-eval-error' ? error : null};
   vm.runInNewContext(submitter, context);

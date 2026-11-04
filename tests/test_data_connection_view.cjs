@@ -15,8 +15,8 @@ function setup(){
   const nodes={'connection-notice':notice,'plan-start':editor,'update-plan-list':{innerHTML:'旧计划'},
     'update-worker-status':{innerHTML:'旧后台状态'},'autostart-controls':{innerHTML:'旧启动状态'}};
   const ctx={backend:{ready:true,csrf:'csrf',snapshots:[],jobs:[],plans:[],worker:null,autostart:null},
-    state:{page:'data'},document:{body:{dataset:{}},getElementById:id=>nodes[id]||null},el:id=>nodes[id]||null,
-    updatePlanList:()=> '核验后的计划',updateWorkerStatus:()=> '核验后的后台状态',autostartControls:()=> '核验后的启动状态',
+    state:{page:'data'},document:{body:{dataset:{}},getElementById:id=>nodes[id]||null,addEventListener(){}},el:id=>nodes[id]||null,
+    updatePlanList:()=> '核验后的计划',updateWorkerStatus:()=> '核验后的后台状态',autostartControls:()=> '核验后的启动状态',refreshStaticDrawRows:async()=>{},
     refreshSnapshotDetail:async()=>{},location:{protocol:'http:',hostname:'127.0.0.1'}};
   ctx.fetch=async url=>({ok:true,status:200,json:async()=>url==='/api/snapshots'?{snapshots:[]}:
     url==='/api/jobs'?{jobs:[]}:{plans:[],worker:{state:'running'},autostart:{}}});

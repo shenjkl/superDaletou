@@ -16,6 +16,10 @@ const context = {backend: {plans: []},
   tag: text => text, runConfigHistory: () => '', planChangeHistory: () => '',
   refreshBackend: async () => {}, toast: text => messages.push(text)};
 vm.runInNewContext(source.slice(listStart, listEnd) + '\n' + source.slice(cancelStart, cancelEnd), context);
+context.submitUpdateWrite=async(_operation,request)=>{
+  const result=await context.backendPost('/api/update-runs/cancel',request);
+  return {accepted:true,entry:{result:result.run}};
+};
 
 function html(status, oneOff=false) {
   context.backend.plans = [{id: 'plan', enabled: !oneOff, config: {run_once: oneOff, interval_seconds: 60, page_size: 20},

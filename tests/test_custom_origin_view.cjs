@@ -12,10 +12,12 @@ function setup(){
   const audit={innerHTML:'old confirmed range'}, button={disabled:false,isConnected:true}, status={textContent:''};
   const data={kind:'historical',issue:'26122',reason:'本人回忆',confirm:'on'};
   const form={dataset:{evaluation:'legacy-1'},isConnected:true,querySelector:s=>s==='[type=submit]'?button:status};
-  const ctx={escape:v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'),
+  const ctx={connectionEpoch:0,backend:{ready:true},escape:v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'),
     document:{addEventListener(){}},crypto:{randomUUID:()=> 'event-1'},
     FormData:class{get(key){return data[key];}},el:id=>id==='holdout-audit-result'?audit:null};
   vm.runInNewContext(source.slice(start,end),ctx);
+  ctx.getDeclarationWriteJournal=()=>({begin:async payload=>({phase:'accepted',payload})});
+  ctx.refreshDeclarationWriteJournal=async()=>{};
   ctx.refreshLegacyOrigins=async()=>{};ctx.refreshReservations=async()=>{};
   return {ctx,audit,button,status,data,form};
 }
@@ -29,7 +31,7 @@ test('legacy records show escaped inputs and complete declaration history',()=>{
 });
 test('submitting declaration invalidates prior audit and preserves id on retry',async()=>{
   const {ctx,audit,form,button}=setup();let payload;
-  ctx.backendPost=async(_path,body)=>{payload=body;};
+  ctx.getDeclarationWriteJournal=()=>({begin:async body=>{payload=body;return {phase:'accepted'};}});
   await ctx.submitLegacyOrigin(form);
   assert.equal(payload.event_id,'event-1');assert.equal(payload.evaluation_key,'legacy-1');
   assert.equal(payload.issue,'26122');assert.equal(payload.confirmed,true);
@@ -37,7 +39,7 @@ test('submitting declaration invalidates prior audit and preserves id on retry',
 });
 test('failed declaration leaves previous audit untouched and reports error',async()=>{
   const {ctx,audit,form,status}=setup();
-  ctx.backendPost=async()=>{throw Error('记录损坏');};
+  ctx.getDeclarationWriteJournal=()=>({begin:async()=>{throw Error('记录损坏');}});
   await ctx.submitLegacyOrigin(form);
   assert.equal(audit.innerHTML,'old confirmed range');assert.equal(status.textContent,'记录损坏');
 });
@@ -49,7 +51,7 @@ test('reloading origins retains a dirty form and reopens its details',async()=>{
   const replacement={dataset:{evaluation:'legacy-1'},closest:()=>details,replaceWith:node=>{transplanted=node;}};
   const root={isConnected:true,get innerHTML(){return html;},set innerHTML(value){html=value;this.fresh=true;},
     querySelectorAll(){return this.fresh?[replacement]:[form];},querySelector:()=>form,insertAdjacentHTML(){},append(){}};
-  const ctx={legacyOriginEpoch:0,legacyOriginTask:null,reservationTask:null,el:id=>id==='legacy-origin-list'?root:null,
+  const ctx={legacyOriginEpoch:0,legacyOriginTask:null,reservationTask:null,connectionEpoch:0,state:{page:'backtest'},el:id=>id==='legacy-origin-list'?root:null,
     escape:String,document:{addEventListener(){}},fetch:async()=>({ok:true,json:async()=>({records:[{status:'available',evaluation_key:'legacy-1',custom_input:{label:'旧记录',payouts:{}},declarations:[]}]})})};
   vm.runInNewContext(source.slice(start,end),ctx);
   assert.equal(await ctx.refreshLegacyOrigins(),true);
@@ -58,7 +60,7 @@ test('reloading origins retains a dirty form and reopens its details',async()=>{
 
 test('origin refresh failure retains a dirty form',async()=>{
   const form={dataset:{dirty:'true'}},root={isConnected:true,textContent:'保留',querySelector:()=>form};
-  const ctx={legacyOriginEpoch:0,legacyOriginTask:null,reservationTask:null,el:()=>root,
+  const ctx={legacyOriginEpoch:0,legacyOriginTask:null,reservationTask:null,connectionEpoch:0,state:{page:'backtest'},el:()=>root,
     document:{addEventListener(){}},fetch:async()=>{throw Error('offline');}};
   vm.runInNewContext(source.slice(start,end),ctx);
   assert.equal(await ctx.refreshLegacyOrigins(),false);assert.equal(root.textContent,'保留');
@@ -68,7 +70,7 @@ test('forced origin revalidation waits for an older request and fetches again',a
   let release,entered,calls=0;
   const waiting=new Promise(resolve=>{release=resolve;}),reached=new Promise(resolve=>{entered=resolve;});
   const root={isConnected:true,innerHTML:'',querySelectorAll:()=>[],querySelector:()=>null};
-  const ctx={legacyOriginEpoch:0,legacyOriginTask:null,reservationTask:null,el:()=>root,
+  const ctx={legacyOriginEpoch:0,legacyOriginTask:null,reservationTask:null,connectionEpoch:0,state:{page:'backtest'},el:()=>root,
     document:{addEventListener(){}},fetch:async()=>{calls++;if(calls===1){entered();await waiting;}return {ok:true,json:async()=>({records:[]})};}};
   vm.runInNewContext(source.slice(start,end),ctx);
   const old=ctx.refreshLegacyOrigins();await reached;
@@ -86,7 +88,7 @@ test('a missing origin retains its draft but disables submission until the origi
     this.forms=records.map(item=>({dataset:{evaluation:item.evaluation_key},closest:()=>({open:false}),
       replaceWith:node=>{this.forms=[node];}}));
   },querySelectorAll(){return this.forms;},querySelector(){return null;},insertAdjacentHTML(){},append(node){this.forms.push(node);}};
-  const ctx={legacyOriginEpoch:0,legacyOriginTask:null,reservationTask:null,el:()=>root,escape:String,
+  const ctx={legacyOriginEpoch:0,legacyOriginTask:null,reservationTask:null,connectionEpoch:0,state:{page:'backtest'},el:()=>root,escape:String,
     document:{addEventListener(){}},fetch:async()=>({ok:true,json:async()=>({records})})};
   vm.runInNewContext(source.slice(start,end),ctx);
   assert.equal(await ctx.refreshLegacyOrigins(),true);

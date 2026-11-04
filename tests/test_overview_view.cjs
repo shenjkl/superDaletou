@@ -12,7 +12,7 @@ assert.ok(part.startsWith('function overviewDate('));
 function makeContext() {
   const root = {innerHTML: ''};
   const context = {
-    overviewState: {data: null, error: '', loading: false, generation: 0, rendered: ''},
+    overviewState: {data: null, error: '', loading: false, generation: 0, rendered: ''}, connectionEpoch:0,backend:{ready:true},
     state: {page: 'overview'}, root,
     escape: value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
     tag: label => `<span>${label}</span>`,

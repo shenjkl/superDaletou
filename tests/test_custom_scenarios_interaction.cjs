@@ -25,7 +25,8 @@ function setup() {
   const context = {backend:{liveResult:{request_key:'pair'},liveEval:null,liveEvalHistory:[],evalHistoryEpoch:0,liveDirty:false},
     state:{page:'generation'}, el:id=>nodes[id]||null, customPayoutFields:Object.keys(values).filter(k=>k.startsWith('payout_')).map(k=>[k.slice(7),k]),
     FormData:class {get(key){return values[key]??null;}}, document:{addEventListener(){}},
-    crypto:{randomUUID:()=> 'request'}, evaluationSources:()=>[], refreshEvaluationHistory(){},
+    crypto:{randomUUID:()=> 'request'}, evaluationSources:()=>[], refreshEvaluationHistory(){}, canonicalScenarioMoney:value=>String(value),
+    customHitFields:Array.from({length:18},(_,i)=>[`${Math.floor(i/3)},${i%3}`,`前区 ${Math.floor(i/3)} + 后区 ${i%3}`]),
     liveEvaluationResult:()=> 'result', toast(){}};
   vm.runInNewContext(source.slice(begin,end), context);
   return {context, values, submit, fields, result};
