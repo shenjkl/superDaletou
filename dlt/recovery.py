@@ -12,7 +12,7 @@ from pathlib import Path
 import re
 import sqlite3
 import stat
-import subprocess
+import ctypes
 import tempfile
 
 from dlt.integrity import check_database
@@ -83,31 +83,131 @@ def _has_write_receipt(database, receipt):
         return False
 
 
+def _windows_security_apis():
+    advapi = ctypes.WinDLL('advapi32', use_last_error=True)
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    handle = ctypes.c_void_p
+    dword = ctypes.c_ulong
+    boolean = ctypes.c_int
+    advapi.OpenProcessToken.argtypes = [handle, dword, ctypes.POINTER(handle)]
+    advapi.OpenProcessToken.restype = boolean
+    advapi.GetTokenInformation.argtypes = [handle, dword, ctypes.c_void_p, dword,
+                                           ctypes.POINTER(dword)]
+    advapi.GetTokenInformation.restype = boolean
+    advapi.ConvertSidToStringSidW.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_wchar_p)]
+    advapi.ConvertSidToStringSidW.restype = boolean
+    advapi.GetNamedSecurityInfoW.argtypes = [ctypes.c_wchar_p, dword, dword,
+                                             ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
+                                             ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p),
+                                             ctypes.POINTER(ctypes.c_void_p)]
+    advapi.GetNamedSecurityInfoW.restype = dword
+    advapi.GetAclInformation.argtypes = [ctypes.c_void_p, ctypes.c_void_p, dword, dword]
+    advapi.GetAclInformation.restype = boolean
+    advapi.GetAce.argtypes = [ctypes.c_void_p, dword, ctypes.POINTER(ctypes.c_void_p)]
+    advapi.GetAce.restype = boolean
+    advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes = [
+        ctypes.c_wchar_p, dword, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(dword)]
+    advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW.restype = boolean
+    advapi.GetSecurityDescriptorDacl.argtypes = [ctypes.c_void_p, ctypes.POINTER(boolean),
+                                                  ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(boolean)]
+    advapi.GetSecurityDescriptorDacl.restype = boolean
+    advapi.SetNamedSecurityInfoW.argtypes = [ctypes.c_wchar_p, dword, dword, ctypes.c_void_p,
+                                             ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+    advapi.SetNamedSecurityInfoW.restype = dword
+    kernel.GetCurrentProcess.restype = handle
+    kernel.CloseHandle.argtypes = [handle]
+    kernel.CloseHandle.restype = boolean
+    kernel.LocalFree.argtypes = [handle]
+    kernel.LocalFree.restype = handle
+    return advapi, kernel
+
+
 def _require_private_acl(path):
     """Inspect Windows allow ACEs without printing the path or ACL contents."""
-    script = r'''
-$ErrorActionPreference = 'Stop'
-$item = [System.IO.Path]::GetFullPath($args[0])
-$currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-$allowed = @($currentSid, 'S-1-5-18', 'S-1-5-32-544')
-$sensitive = [int][System.Security.AccessControl.FileSystemRights]::FullControl -band (-bnot [int][System.Security.AccessControl.FileSystemRights]::Synchronize)
-$acl = Get-Acl -LiteralPath $item
-foreach ($entry in $acl.Access) {
-  if ($entry.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) { continue }
-  $sid = $entry.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
-  $rights = [int]$entry.FileSystemRights
-  if (($allowed -notcontains $sid) -and (($rights -band $sensitive) -ne 0)) { exit 17 }
-}
-[Console]::Write('OK')
-'''
-    environment = os.environ.copy()
-    environment['DLT_ACL_CHECK_PATH'] = str(path)
-    completed = subprocess.run(['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive',
-                                '-Command', script.replace("$args[0]", "$env:DLT_ACL_CHECK_PATH")],
-                               capture_output=True, text=True, timeout=8, check=False,
-                               env=environment)
-    if completed.returncode != 0 or completed.stdout.strip() != 'OK':
-        raise RecoveryError('明文资料路径 ACL 不安全或无法核验')
+    advapi, kernel = _windows_security_apis()
+
+    class TokenUser(ctypes.Structure):
+        _fields_ = [('sid', ctypes.c_void_p), ('attributes', ctypes.c_ulong)]
+
+    class AclSizeInformation(ctypes.Structure):
+        _fields_ = [('ace_count', ctypes.c_ulong), ('bytes_used', ctypes.c_ulong),
+                    ('bytes_free', ctypes.c_ulong)]
+
+    token = ctypes.c_void_p()
+    if not advapi.OpenProcessToken(kernel.GetCurrentProcess(), 0x0008, ctypes.byref(token)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        required = ctypes.c_ulong()
+        advapi.GetTokenInformation(token, 1, None, 0, ctypes.byref(required))
+        if not required.value:
+            raise ctypes.WinError(ctypes.get_last_error())
+        token_data = ctypes.create_string_buffer(required.value)
+        if not advapi.GetTokenInformation(token, 1, token_data, required.value, ctypes.byref(required)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        current_sid_ptr = ctypes.cast(token_data, ctypes.POINTER(TokenUser)).contents.sid
+        current_sid_buf = ctypes.c_wchar_p()
+        if not advapi.ConvertSidToStringSidW(current_sid_ptr, ctypes.byref(current_sid_buf)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            allowed_sids = {current_sid_buf.value, 'S-1-5-18', 'S-1-5-32-544'}
+        finally:
+            kernel.LocalFree(ctypes.cast(current_sid_buf, ctypes.c_void_p))
+    finally:
+        kernel.CloseHandle(token)
+
+    owner = ctypes.c_void_p()
+    group = ctypes.c_void_p()
+    dacl = ctypes.c_void_p()
+    sacl = ctypes.c_void_p()
+    security_descriptor = ctypes.c_void_p()
+    result = advapi.GetNamedSecurityInfoW(str(path), 1, 0x00000004,
+                                          ctypes.byref(owner), ctypes.byref(group),
+                                          ctypes.byref(dacl), ctypes.byref(sacl),
+                                          ctypes.byref(security_descriptor))
+    if result != 0:
+        raise OSError(result, 'GetNamedSecurityInfoW failed')
+    try:
+        if not dacl.value:
+            raise RecoveryError('明文资料路径 ACL 不安全或无法核验')
+        info = AclSizeInformation()
+        if not advapi.GetAclInformation(dacl, ctypes.byref(info), ctypes.sizeof(info), 2):
+            raise ctypes.WinError(ctypes.get_last_error())
+        sensitive = 0x000F01FF  # FILE_ALL_ACCESS without SYNCHRONIZE.
+        allowed_ace_types = {0, 5, 9, 11}  # Allow, object, callback and callback-object ACEs.
+        for index in range(info.ace_count):
+            ace = ctypes.c_void_p()
+            if not advapi.GetAce(dacl, index, ctypes.byref(ace)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            raw = ctypes.cast(ace, ctypes.POINTER(ctypes.c_ubyte))
+            ace_type = raw[0]
+            if ace_type not in allowed_ace_types:
+                continue
+            mask = int.from_bytes(ctypes.string_at(ace.value + 4, 4), 'little')
+            if mask & 0x10000000:  # GENERIC_ALL
+                mask |= 0x001F01FF
+            if mask & 0x80000000:  # GENERIC_READ
+                mask |= 0x00120089
+            if mask & 0x40000000:  # GENERIC_WRITE
+                mask |= 0x00120116
+            if mask & 0x20000000:  # GENERIC_EXECUTE
+                mask |= 0x001200A0
+            if not mask & sensitive:
+                continue
+            sid_offset = 8
+            if ace_type in (5, 11):
+                object_flags = int.from_bytes(ctypes.string_at(ace.value + 8, 4), 'little')
+                sid_offset += 4 + (16 if object_flags & 1 else 0) + (16 if object_flags & 2 else 0)
+            sid_ptr = ctypes.c_void_p(ace.value + sid_offset)
+            sid_text = ctypes.c_wchar_p()
+            if not advapi.ConvertSidToStringSidW(sid_ptr, ctypes.byref(sid_text)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            try:
+                if sid_text.value not in allowed_sids:
+                    raise RecoveryError('明文资料路径 ACL 不安全或无法核验')
+            finally:
+                kernel.LocalFree(ctypes.cast(sid_text, ctypes.c_void_p))
+    finally:
+        kernel.LocalFree(security_descriptor)
 
 
 def _is_windows_reparse_point(path):
@@ -140,7 +240,7 @@ def require_private_directory(directory):
                 raise RecoveryError('明文资料目录须仅允许当前用户访问 (POSIX mode 0700)')
     except RecoveryError:
         raise
-    except (OSError, subprocess.SubprocessError, ValueError, TypeError) as exc:
+    except (OSError, ValueError, TypeError, AttributeError) as exc:
         raise RecoveryError('明文资料目录访问权限无法核验；未继续恢复') from exc
 
 
@@ -151,37 +251,51 @@ def protect_private_directory(directory):
         if path.is_symlink() or _is_windows_reparse_point(path) or not path.is_dir():
             raise RecoveryError('新建明文资料目录无法保护')
         if os.name == 'nt':
-            script = r'''
-$ErrorActionPreference = 'Stop'
-$item = [System.IO.Path]::GetFullPath($env:DLT_ACL_CHECK_PATH)
-$currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User
-$systemSid = New-Object Security.Principal.SecurityIdentifier('S-1-5-18')
-$adminSid = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')
-$acl = Get-Acl -LiteralPath $item
-$acl.SetAccessRuleProtection($true, $false)
-foreach ($entry in @($acl.Access)) { [void]$acl.RemoveAccessRuleSpecific($entry) }
-$inherit = [Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [Security.AccessControl.InheritanceFlags]::ObjectInherit
-$propagation = [Security.AccessControl.PropagationFlags]::None
-$allow = [Security.AccessControl.AccessControlType]::Allow
-foreach ($sid in @($currentSid, $systemSid, $adminSid)) {
-  $rule = New-Object Security.AccessControl.FileSystemAccessRule($sid, [Security.AccessControl.FileSystemRights]::FullControl, $inherit, $propagation, $allow)
-  [void]$acl.AddAccessRule($rule)
-}
-Set-Acl -LiteralPath $item -AclObject $acl
-[Console]::Write('OK')
-'''
-            environment = os.environ.copy()
-            environment['DLT_ACL_CHECK_PATH'] = str(path)
-            completed = subprocess.run(['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script],
-                                       capture_output=True, text=True, timeout=8, check=False, env=environment)
-            if completed.returncode != 0 or completed.stdout.strip() != 'OK':
-                raise RecoveryError('新建明文资料目录 ACL 设置失败')
+            advapi, kernel = _windows_security_apis()
+            token = ctypes.c_void_p()
+            if not advapi.OpenProcessToken(kernel.GetCurrentProcess(), 0x0008, ctypes.byref(token)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            try:
+                required = ctypes.c_ulong()
+                advapi.GetTokenInformation(token, 1, None, 0, ctypes.byref(required))
+                token_data = ctypes.create_string_buffer(required.value)
+                if not required.value or not advapi.GetTokenInformation(
+                        token, 1, token_data, required.value, ctypes.byref(required)):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                current_sid = ctypes.cast(token_data, ctypes.POINTER(ctypes.c_void_p)).contents.value
+                sid_text = ctypes.c_wchar_p()
+                if not advapi.ConvertSidToStringSidW(current_sid, ctypes.byref(sid_text)):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                try:
+                    descriptor = ctypes.c_void_p()
+                    descriptor_size = ctypes.c_ulong()
+                    sddl = f'D:P(A;OICI;FA;;;{sid_text.value})(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)'
+                    if not advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                            sddl, 1, ctypes.byref(descriptor), ctypes.byref(descriptor_size)):
+                        raise ctypes.WinError(ctypes.get_last_error())
+                    try:
+                        present = ctypes.c_int()
+                        defaulted = ctypes.c_int()
+                        dacl = ctypes.c_void_p()
+                        if not advapi.GetSecurityDescriptorDacl(descriptor, ctypes.byref(present),
+                                                                ctypes.byref(dacl), ctypes.byref(defaulted)) or not present.value:
+                            raise ctypes.WinError(ctypes.get_last_error())
+                        result = advapi.SetNamedSecurityInfoW(str(path), 1, 0x80000004,
+                                                              None, None, dacl, None)
+                        if result != 0:
+                            raise OSError(result, 'SetNamedSecurityInfoW failed')
+                    finally:
+                        kernel.LocalFree(descriptor)
+                finally:
+                    kernel.LocalFree(ctypes.cast(sid_text, ctypes.c_void_p))
+            finally:
+                kernel.CloseHandle(token)
         else:
             os.chmod(path, 0o700)
         require_private_directory(path)
     except RecoveryError:
         raise
-    except (OSError, subprocess.SubprocessError, ValueError, TypeError) as exc:
+    except (OSError, ValueError, TypeError, AttributeError) as exc:
         raise RecoveryError('新建明文资料目录 ACL 设置失败') from exc
 
 
@@ -197,7 +311,7 @@ def require_private_file(file_path):
             raise RecoveryError('明文候选须仅允许当前用户访问 (POSIX mode 0600)')
     except RecoveryError:
         raise
-    except (OSError, subprocess.SubprocessError, ValueError, TypeError) as exc:
+    except (OSError, ValueError, TypeError, AttributeError) as exc:
         raise RecoveryError('明文候选文件访问权限无法核验；未继续恢复') from exc
 
 

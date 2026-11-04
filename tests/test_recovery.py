@@ -14,7 +14,8 @@ import unittest
 from unittest.mock import patch
 
 from dlt.integrity import check_database
-from dlt.recovery import RecoveryError, _publish_staged, prepare_isolated_copy
+from dlt.recovery import (RecoveryError, _publish_staged, prepare_isolated_copy,
+                          protect_private_directory, require_private_directory, require_private_file)
 from dlt.recovery_guard import RecoveryQuarantined, require_path_execution_allowed
 from dlt.scheduler import Scheduler
 import test_prospective_settlement as fixtures
@@ -27,14 +28,30 @@ class IsolatedRecoveryTests(unittest.TestCase):
 
     def setUp(self):
         fixtures.PaperResultsTests.setUp(self)
+        protect_private_directory(self.path.parent)
         self.snapshot = self.import_draw(self.draw)
         self.paper.process_one('exp', self.snapshot)
         workspace = Path(__file__).resolve().parents[1]
         self.destination_dir = tempfile.TemporaryDirectory(dir=workspace)
         root = Path(self.destination_dir.name).resolve()
         self.assertTrue(root.is_relative_to(workspace))
+        protect_private_directory(root)
         self.addCleanup(self.destination_dir.cleanup)
         self.target = root / 'isolated.sqlite3'
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows ACL APIs are only available on Windows')
+    def test_windows_acl_api_rejects_inherited_access_and_protects_new_directory(self):
+        workspace = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory(dir=workspace) as temp:
+            directory = Path(temp) / 'private-acl'
+            directory.mkdir()
+            with self.assertRaises(RecoveryError):
+                require_private_directory(directory)
+            protect_private_directory(directory)
+            require_private_directory(directory)
+            file_path = directory / 'private.sqlite3'
+            file_path.write_bytes(b'private')
+            require_private_file(file_path)
 
     def test_snapshot_preserves_results_without_modifying_source(self):
         before = hashlib.sha256(self.path.read_bytes()).hexdigest()
@@ -52,6 +69,7 @@ class IsolatedRecoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=workspace) as directory:
             root = Path(directory).resolve()
             self.assertTrue(root.is_relative_to(workspace))
+            protect_private_directory(root)
             target = root / 'isolated.sqlite3'
             before = hashlib.sha256(self.path.read_bytes()).hexdigest()
             report = prepare_isolated_copy(self.path, target)
@@ -95,7 +113,7 @@ class IsolatedRecoveryTests(unittest.TestCase):
         prepare_isolated_copy(self.path, self.target)
         copy_scheduler = Scheduler(self.target)
         with patch('socket.socket', side_effect=AssertionError('socket must not be opened')):
-            with self.assertRaises(RecoveryQuarantined):
+            with self.assertRaises(RecoveryError):
                 LocalServer(0, self.target)
             for action in (lambda: copy_scheduler.claim(plan), copy_scheduler.run_due,
                            copy_scheduler.process_pending_followups,
@@ -128,7 +146,7 @@ class IsolatedRecoveryTests(unittest.TestCase):
         prepare_isolated_copy(self.path, self.target)
         with patch('sys.argv', ['worker', '--db', str(self.target), 'run']), \
                 patch('socket.socket', side_effect=AssertionError('socket must not be opened')):
-            with self.assertRaises(RecoveryQuarantined):
+            with self.assertRaises(RecoveryError):
                 worker.main()
 
     def test_quarantine_blocks_direct_job_entries_and_interruption_recovery(self):
@@ -168,11 +186,25 @@ class IsolatedRecoveryTests(unittest.TestCase):
     def test_interrupted_recovery_does_not_rewrite_retained_running_jobs(self):
         from dlt.training_jobs import TrainingJobs
         from dlt.backtest_jobs import BacktestJobs
+        from dlt.candidates import _canonical
+        from dlt.snapshots import SnapshotStore
+        from test_model_repository import config as model_config, payload as model_payload
+        from test_backtest import protocol as backtest_protocol, source_data
         TrainingJobs(self.path).initialize()
         BacktestJobs(self.path).initialize()
+        model_snapshot = SnapshotStore(self.path).import_official(
+            model_payload(), 'running-job fixture', '2026-02-01T12:00:00+00:00')['snapshot_id']
+        training_request = TrainingJobs._validate('retained training', model_config(model_snapshot),
+                                                  '26001', 20)
+        backtest_snapshot = SnapshotStore(self.path).import_official(
+            json.dumps(source_data()).encode(), 'running-backtest fixture',
+            '2026-02-01T12:00:00+00:00')['snapshot_id']
+        backtest_request = {'protocol': backtest_protocol(backtest_snapshot), 'timeout': 30}
         with closing(sqlite3.connect(self.path)) as db, db:
-            db.execute("INSERT INTO training_jobs VALUES ('retained-train',?, 'fixture', 'running', '2026-01-01', NULL, NULL, NULL)", (b'{}',))
-            db.execute("INSERT INTO backtest_jobs VALUES ('retained-backtest',?, 'running', '2026-01-01', NULL, NULL)", (b'{}',))
+            db.execute("INSERT INTO training_jobs VALUES ('retained-train',?, 'retained training', 'running', '2026-02-01T12:00:00+00:00', NULL, NULL, NULL)",
+                       (_canonical(training_request),))
+            db.execute("INSERT INTO backtest_jobs VALUES ('retained-backtest',?, 'running', '2026-02-01T12:00:00+00:00', NULL, NULL)",
+                       (_canonical(backtest_request),))
         prepare_isolated_copy(self.path, self.target)
         for jobs in (TrainingJobs(self.target), BacktestJobs(self.target)):
             with self.assertRaises(RecoveryQuarantined):
@@ -186,20 +218,24 @@ class IsolatedRecoveryTests(unittest.TestCase):
         prepare_isolated_copy(self.path, self.target)
         with patch('sys.argv', ['app', '--db', str(self.target), '--port', '8766']), \
                 patch('socket.socket', side_effect=AssertionError('socket must not be opened')):
-            with self.assertRaises(RecoveryQuarantined):
+            with self.assertRaises(RecoveryError):
                 app.main()
         self.assertFalse(Path(str(self.target)+'.app.lock').exists())
 
     def test_uncheckpointed_wal_is_included_in_consistent_copy(self):
+        from dlt.candidates import _canonical
         with closing(sqlite3.connect(self.path)) as db:
             self.assertEqual(db.execute('PRAGMA journal_mode=WAL').fetchone()[0], 'wal')
-            db.execute("INSERT INTO paper_events VALUES ('wal-event','exp',?,'fixture','test','2026-01-01')", (self.snapshot,))
+            event = {'experiment': 'exp', 'snapshot': self.snapshot, 'status': 'error', 'reason': 'test'}
+            event_id = hashlib.sha256(_canonical(event)).hexdigest()
+            db.execute('INSERT INTO paper_events VALUES (?,?,?,?,?,?)',
+                       (event_id, 'exp', self.snapshot, 'error', 'test', '2026-01-01T00:00:00+00:00'))
             db.commit()
             self.assertTrue(Path(str(self.path)+'-wal').exists())
             report = prepare_isolated_copy(self.path, self.target)
             self.assertEqual(report['status'], 'prepared')
             with closing(sqlite3.connect(self.target)) as copied:
-                self.assertEqual(copied.execute("SELECT count(*) FROM paper_events WHERE id='wal-event'").fetchone()[0], 1)
+                self.assertEqual(copied.execute('SELECT count(*) FROM paper_events WHERE id=?', (event_id,)).fetchone()[0], 1)
 
     def test_cleanup_failure_is_reported_after_publication(self):
         real_unlink = Path.unlink

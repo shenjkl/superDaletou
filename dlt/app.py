@@ -1883,6 +1883,9 @@ def main():
     supplied_path = Path(args.db)
     reject_database_reparse_path(supplied_path)
     path = supplied_path.resolve()
+    # Reject quarantined or exposed databases before creating the single-instance
+    # lock file. LocalServer repeats this check before schema initialization.
+    prepare_runtime_database_path(supplied_path)
     with SingleInstance(path):
         server = LocalServer(args.port, supplied_path)
         server.jobs.recover_interrupted()
