@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
@@ -15,7 +15,7 @@ const browser = [
 const python = process.env.DLT_PYTHON || path.join(repository, '.venv', 'Scripts', 'python.exe');
 const tempRoot = process.env.DLT_BROWSER_TEST_ROOT;
 
-test('real Chrome recovers create and edit responses and verifies update-plan enable/disable', {
+test('real Chrome recovers update-plan writes and cancellation across LocalServer restarts', {
   skip: !browser || !tempRoot || !fs.existsSync(python),
   timeout: 180000,
 }, async () => {
@@ -160,7 +160,8 @@ test('real Chrome recovers create and edit responses and verifies update-plan en
       const message = JSON.parse(event.data);
       if (message.method !== 'Fetch.requestPaused') return;
       const params = message.params;
-      if (params.request.method === 'POST' && params.request.url.includes('/api/update-plans')) {
+      if (params.request.method === 'POST'
+          && (params.request.url.includes('/api/update-plans') || params.request.url.includes('/api/update-runs/cancel'))) {
         postResponses++;
         if (dropResponse && params.responseStatusCode === 200) {
           dropResponse = false;
@@ -172,7 +173,10 @@ test('real Chrome recovers create and edit responses and verifies update-plan en
       }
       connection.send('Fetch.continueRequest', { requestId: params.requestId }).catch(() => {});
     });
-    await connection.send('Fetch.enable', { patterns: [{ urlPattern: `${origin}/api/update-plans*`, requestStage: 'Response' }] });
+    await connection.send('Fetch.enable', { patterns: [
+      { urlPattern: `${origin}/api/update-plans*`, requestStage: 'Response' },
+      { urlPattern: `${origin}/api/update-runs/cancel*`, requestStage: 'Response' },
+    ] });
     let formReady = false;
     for (let i = 0; i < 300; i++) {
       formReady = await evaluate("Boolean(document.querySelector('#update-plan-form') && document.body.dataset.serverStatus==='verified')");
@@ -382,7 +386,158 @@ test('real Chrome recovers create and edit responses and verifies update-plan en
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     assert.equal(disabledPlans.plans.find(plan => plan.id === planId).enabled, false, 'plan disable was not persisted');
-    assert.equal(postResponses, 4, 'create, edit, enable and disable should each send one POST');
+    let disabledEntry;
+    let afterDisable;
+    for (let i = 0; i < 100; i++) {
+      afterDisable = await evaluate(`new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+        r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      disabledEntry = afterDisable.find(entry => entry.operation === 'update_plan_set_enabled' && entry.request.enabled === false);
+      if (disabledEntry?.phase === 'accepted') break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(disabledEntry?.phase, 'accepted', 'product UI did not record the accepted pause request');
+    await evaluate(`window.confirm=()=>true;document.querySelector('#update-write-journal [data-update-write-action="dismiss"][data-request="${disabledEntry.request_key}"]').click()`);
+    let afterDisableCleanup;
+    for (let i = 0; i < 100; i++) {
+      afterDisableCleanup = await evaluate(`new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+        r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      if (!afterDisableCleanup.length) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(afterDisableCleanup.length, 0, 'product UI did not clear the verified pause request');
+
+    const pausedRunNowPromise = armResponseDrop();
+    await evaluate(`document.querySelector('#update-plan-list [data-action="run-plan-now"][data-plan="${planId}"]').click()`);
+    const pausedRunNow = await waitForDroppedResponse(pausedRunNowPromise);
+    assert.equal(pausedRunNow.responseStatusCode, 200, 'server did not accept the immediate update request');
+    await connection.send('Fetch.failRequest', { requestId: pausedRunNow.requestId, errorReason: 'ConnectionReset' });
+    let pendingRunNow;
+    for (let i = 0; i < 300; i++) {
+      pendingRunNow = await evaluate(`new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+        r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      if (pendingRunNow.some(entry => entry.operation === 'update_plan_run_now' && entry.phase === 'submitted')) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    const pendingRunNowEntry = pendingRunNow.find(entry => entry.operation === 'update_plan_run_now');
+    assert.equal(pendingRunNowEntry?.phase, 'submitted', 'product UI did not retain the immediate update request');
+    const runNowServerPid = serverProcess.pid;
+    await stopServer(serverProcess);
+    await startServer();
+    assert.notEqual(serverProcess.pid, runNowServerPid, 'LocalServer was not restarted before immediate update recovery');
+    await connection.send('Page.reload', { ignoreCache: true });
+    let runNowReloaded = false;
+    for (let i = 0; i < 300; i++) {
+      runNowReloaded = await evaluate("document.readyState==='complete' && Boolean(window.UpdateWriteJournal)");
+      if (runNowReloaded) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    assert.equal(runNowReloaded, true, 'application did not reload after immediate update restart');
+    let recoveredRunNow;
+    for (let i = 0; i < 300; i++) {
+      recoveredRunNow = await evaluate(`(async()=>({ready:document.body.dataset.serverStatus==='verified',entries:
+        await new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+          r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+            get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}}),
+        dismiss:!!document.querySelector('#update-write-journal [data-update-write-action="dismiss"][data-request="${pendingRunNowEntry.request_key}"]')}))()`);
+      if (recoveredRunNow.ready && recoveredRunNow.dismiss) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    const acceptedRunNow = recoveredRunNow.entries.find(entry => entry.request_key === pendingRunNowEntry.request_key);
+    assert.equal(acceptedRunNow?.phase, 'accepted', 'product recovery did not retain the immediate update receipt');
+    const runNowState = await evaluate(`fetch('/api/update-write-requests?key='+encodeURIComponent('${pendingRunNowEntry.request_key}'),
+      {credentials:'same-origin'}).then(response=>response.json())`);
+    assert.equal(runNowState.write.operation, 'update_plan_run_now');
+    const oneOffPlanId = runNowState.write.result.id;
+    let currentPlans = await evaluate("fetch('/api/update-plans',{credentials:'same-origin'}).then(response=>response.json())");
+    assert.equal(currentPlans.plans.filter(plan => plan.id === oneOffPlanId).length, 1,
+      'immediate update should create exactly one one-off plan');
+    await evaluate(`window.confirm=()=>true;document.querySelector('#update-write-journal [data-update-write-action="dismiss"][data-request="${pendingRunNowEntry.request_key}"]').click()`);
+    let afterRunNowCleanup;
+    for (let i = 0; i < 100; i++) {
+      afterRunNowCleanup = await evaluate(`new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+        r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      if (!afterRunNowCleanup.length) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(afterRunNowCleanup.length, 0, 'product UI did not clear the verified immediate update request');
+
+    const claim = spawnSync(python, [path.join(__dirname, 'claim_update_run.py'),
+      path.join(dataDirectory, 'browser-test.sqlite3'), oneOffPlanId], {
+      cwd: repository,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: { ...process.env, PYTHONPATH: `${repository};${path.join(repository, 'tests')}` },
+    });
+    assert.equal(claim.status, 0, `isolated scheduler could not claim the synthetic run: ${claim.stderr}`);
+    const runId = claim.stdout.trim();
+    assert.match(runId, /^[0-9a-f]{32}$/, 'synthetic scheduler claim did not return a run identifier');
+    await evaluate("location.hash='#overview'");
+    for (let i = 0; i < 100; i++) {
+      if (await evaluate("document.querySelector('#navigation a[href=\"#overview\"][aria-current=\"page\"]')!==null")) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    await evaluate("location.hash='#data'");
+    let cancelReady = false;
+    for (let i = 0; i < 300; i++) {
+      cancelReady = await evaluate(`Boolean(document.querySelector('#update-plan-list [data-action="cancel-update-run"][data-plan="${oneOffPlanId}"][data-run="${runId}"]'))`);
+      if (cancelReady) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(cancelReady, true, 'product UI did not show the claimed synthetic run for cancellation');
+    const pausedCancelPromise = armResponseDrop();
+    await evaluate(`document.querySelector('#update-plan-list [data-action="cancel-update-run"][data-plan="${oneOffPlanId}"][data-run="${runId}"]').click()`);
+    const pausedCancel = await waitForDroppedResponse(pausedCancelPromise);
+    assert.equal(pausedCancel.responseStatusCode, 200, 'server did not accept the run cancellation request');
+    await connection.send('Fetch.failRequest', { requestId: pausedCancel.requestId, errorReason: 'ConnectionReset' });
+    let pendingCancel;
+    for (let i = 0; i < 300; i++) {
+      pendingCancel = await evaluate(`new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+        r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      if (pendingCancel.some(entry => entry.operation === 'update_run_cancel' && entry.phase === 'submitted')) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    const pendingCancelEntry = pendingCancel.find(entry => entry.operation === 'update_run_cancel');
+    assert.equal(pendingCancelEntry?.phase, 'submitted', 'product UI did not retain the cancellation request');
+    const cancelServerPid = serverProcess.pid;
+    await stopServer(serverProcess);
+    await startServer();
+    assert.notEqual(serverProcess.pid, cancelServerPid, 'LocalServer was not restarted before cancellation recovery');
+    await connection.send('Page.reload', { ignoreCache: true });
+    let recoveredCancel;
+    for (let i = 0; i < 300; i++) {
+      recoveredCancel = await evaluate(`(async()=>({ready:document.body.dataset.serverStatus==='verified',entries:
+        await new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+          r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+            get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}}),
+        dismiss:!!document.querySelector('#update-write-journal [data-update-write-action="dismiss"][data-request="${pendingCancelEntry.request_key}"]')}))()`);
+      if (recoveredCancel.ready && recoveredCancel.dismiss) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(recoveredCancel.entries.find(entry => entry.request_key === pendingCancelEntry.request_key)?.phase,
+      'accepted', 'product recovery did not retain the cancellation receipt');
+    const cancelledWrite = await evaluate(`fetch('/api/update-write-requests?key='+encodeURIComponent('${pendingCancelEntry.request_key}'),
+      {credentials:'same-origin'}).then(response=>response.json())`);
+    assert.equal(cancelledWrite.write.operation, 'update_run_cancel');
+    assert.equal(cancelledWrite.write.result.status, 'cancelling');
+    currentPlans = await evaluate("fetch('/api/update-plans',{credentials:'same-origin'}).then(response=>response.json())");
+    const cancelledRun = currentPlans.plans.find(plan => plan.id === oneOffPlanId).runs.find(run => run.id === runId);
+    assert.equal(cancelledRun.status, 'cancelling', 'run cancellation transition was not persisted');
+    await evaluate(`window.confirm=()=>true;document.querySelector('#update-write-journal [data-update-write-action="dismiss"][data-request="${pendingCancelEntry.request_key}"]').click()`);
+    let afterCancelCleanup;
+    for (let i = 0; i < 100; i++) {
+      afterCancelCleanup = await evaluate(`new Promise((resolve,reject)=>{const r=indexedDB.open('dlt-update-write-journal',1);r.onerror=()=>reject(r.error);
+        r.onsuccess=()=>{const db=r.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      if (!afterCancelCleanup.length) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(afterCancelCleanup.length, 0, 'product UI did not clear the verified cancellation request');
+    assert.equal(postResponses, 6, 'create, edit, enable, disable, immediate update and cancel should each send one POST');
     const version = await (await fetch(`http://127.0.0.1:${devtoolsPort}/json/version`)).json();
     const browserConnection = await connectDevtools(version.webSocketDebuggerUrl);
     browserSocket = browserConnection.socket;
