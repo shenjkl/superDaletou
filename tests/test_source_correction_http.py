@@ -8,6 +8,7 @@ from unittest.mock import patch
 from dlt.app import LocalServer
 from dlt.scheduler import Scheduler
 import test_prospective_settlement as fixtures
+from test_prospective import swap_first_second_prize_codes
 
 
 class SourceCorrectionHttpTests(unittest.TestCase):
@@ -16,7 +17,11 @@ class SourceCorrectionHttpTests(unittest.TestCase):
     review = fixtures.PaperResultsTests.review
 
     def start_server(self):
-        server = LocalServer(0, self.path)
+        # The sandbox cannot inspect temp-directory ACLs; this HTTP class
+        # exercises route behavior while recovery tests cover ACL enforcement.
+        with patch('dlt.recovery._require_private_acl'):
+            server = LocalServer(0, self.path)
+        self.http_server = server
         server.experiments = self.repo
         server.jobs.recover_interrupted(); server.backtests.recover_interrupted()
         thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
@@ -39,7 +44,7 @@ class SourceCorrectionHttpTests(unittest.TestCase):
     def correction_body(self):
         corrected = deepcopy(self.frozen['rule_review']['extracted'])
         corrected['version'] = 'corrected-http-v2'
-        corrected['payout_sort_map'] = {'first': '301', 'first-extra': '401', 'second': '101', 'second-extra': '201'}
+        corrected = swap_first_second_prize_codes(corrected)
         new_id = self.review('rule', corrected)
         return {'old_review_id': self.rule_id, 'new_review_id': new_id,
                 'note': 'synthetic correction only', 'confirmed': True}

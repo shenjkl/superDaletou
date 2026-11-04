@@ -12,7 +12,13 @@ import test_prospective_settlement as paper_fixtures
 
 
 class PaperHttpTests(unittest.TestCase):
-    setUp = paper_fixtures.PaperResultsTests.setUp
+    def setUp(self):
+        # The sandbox cannot inspect temp-directory ACLs; ACL enforcement is
+        # covered separately from these route-level HTTP contracts.
+        self._acl_patch = patch('dlt.recovery._require_private_acl')
+        self._acl_patch.start()
+        self.addCleanup(self._acl_patch.stop)
+        paper_fixtures.PaperResultsTests.setUp(self)
     import_draw = paper_fixtures.PaperResultsTests.import_draw
     review = paper_fixtures.PaperResultsTests.review
 

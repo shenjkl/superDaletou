@@ -17,6 +17,30 @@ from dlt.prospective import ProspectiveRepository, RegistrationError
 from dlt.snapshots import SnapshotStore
 from test_candidates import config, input_rows
 from test_settlement import fixture
+from dlt.prize_rules import (DLT_2026_ADDITIONAL_GROUPS, DLT_2026_HIT_GROUPS,
+                             DLT_2026_OFFICIAL_SORT_CODES)
+
+
+def complete_current_rule(rule, payout_sort_map=None):
+    """Keep prospective fixtures aligned with the complete current prize contract."""
+    codes = sorted(DLT_2026_OFFICIAL_SORT_CODES)
+    names = {'101': 'first', '201': 'first-extra', '301': 'second', '401': 'second-extra'}
+    names.update({code: f'prize-{code}' for code in codes if code not in names})
+    payout_sort_map = payout_sort_map or {names[code]: code for code in codes}
+    code_by_group = {group: str(code) for group, code in payout_sort_map.items()}
+    group_by_code = {code: group for group, code in code_by_group.items()}
+    rule['hit_groups'] = {outcome: group_by_code.get(code) for outcome, code in DLT_2026_HIT_GROUPS.items()}
+    rule['additional_groups'] = {group_by_code[base]: group_by_code[extra]
+                                 for base, extra in DLT_2026_ADDITIONAL_GROUPS.items()}
+    rule['payout_sort_map'] = payout_sort_map
+    return rule
+
+
+def swap_first_second_prize_codes(rule):
+    mapping = dict(rule['payout_sort_map'])
+    mapping['first'], mapping['second'] = mapping['second'], mapping['first']
+    mapping['first-extra'], mapping['second-extra'] = mapping['second-extra'], mapping['first-extra']
+    return complete_current_rule(rule, mapping)
 
 
 class ProspectiveTests(unittest.TestCase):
@@ -45,9 +69,8 @@ class ProspectiveTests(unittest.TestCase):
             pair_repo.save_draft(f'pair-{i}', {**self.config, 'seed': i}, history_first_issue='26001',
                                  history_cutoff_issue='26016')
         self.repo = ProspectiveRepository(self.path, clock=lambda: self.now)
-        rule = fixture()['rule']; rule['version'] = self.config['rule_version']; rule['applicable_issues'] = ['26017']
+        rule = complete_current_rule(fixture()['rule']); rule['version'] = self.config['rule_version']; rule['applicable_issues'] = ['26017']
         rule['source'] = 'https://www.sporttery.cn/synthetic-test'
-        rule['payout_sort_map'] = {'first': '101', 'first-extra': '201', 'second': '301', 'second-extra': '401'}
         self.calendar = {'issue': '26017', 'draw_date': target_day.isoformat(), 'cutoff_at': self.deadline.isoformat(),
                          'version': self.config['calendar_version']}
         self.cal_id = self.review('calendar', self.calendar)

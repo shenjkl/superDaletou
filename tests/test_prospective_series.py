@@ -17,6 +17,11 @@ import test_prospective as fixtures
 import test_prospective_settlement as paper_fixtures
 
 
+SERIES_KEY = '00000000-0000-4000-8000-000000000001'
+LEGACY_SERIES_KEY = '00000000-0000-4000-8000-000000000002'
+MAX_SEED_SERIES_KEY = '00000000-0000-4000-8000-000000000003'
+
+
 class SeriesTests(unittest.TestCase):
     review = fixtures.ProspectiveTests.review
     import_draw = paper_fixtures.PaperResultsTests.import_draw
@@ -55,42 +60,42 @@ class SeriesTests(unittest.TestCase):
                 'replicas': [{'replica': 'a', 'pair_key': 'next-3'}, {'replica': 'b', 'pair_key': 'next-4'}]}
 
     def test_two_periods_preserve_protocol_and_close_without_cancelling_existing(self):
-        first = self.series.create('series', self.manifest)
-        self.assertEqual(first, self.series.create('series', self.manifest))
-        self.repo.freeze('period-1', self.protocol, series_key='series')
+        first = self.series.create(SERIES_KEY, self.manifest)
+        self.assertEqual(first, self.series.create(SERIES_KEY, self.manifest))
+        self.repo.freeze('period-1', self.protocol, series_key=SERIES_KEY)
         second = self.prepare_second()
-        self.repo.freeze('period-2', second, series_key='series')
-        self.assertEqual({x['issue'] for x in self.series.get('series')['periods']}, {'26017', '26018'})
-        self.series.close('series', 'end of observation')
-        self.assertEqual(self.repo.freeze('period-2', second, series_key='series')['protocol'], second)
+        self.repo.freeze('period-2', second, series_key=SERIES_KEY)
+        self.assertEqual({x['issue'] for x in self.series.get(SERIES_KEY)['periods']}, {'26017', '26018'})
+        self.series.close(SERIES_KEY, 'end of observation')
+        self.assertEqual(self.repo.freeze('period-2', second, series_key=SERIES_KEY)['protocol'], second)
         with self.assertRaisesRegex(RegistrationError, 'closed'):
-            self.repo.freeze('duplicate', second, series_key='series')
+            self.repo.freeze('duplicate', second, series_key=SERIES_KEY)
         report = check_database(self.path)
         self.assertEqual(report['status'], 'passed', report)
         self.assertEqual(report['counts']['series_periods'], 2)
 
     def test_series_period_write_can_be_prepared_fenced_and_retried_by_original_key(self):
-        self.series.create('series', self.manifest)
-        original = self.repo.prepare_write('period-original', self.protocol, series_key='series')
+        self.series.create(SERIES_KEY, self.manifest)
+        original = self.repo.prepare_write('period-original', self.protocol, series_key=SERIES_KEY)
         self.assertEqual(self.repo.write_status('period-original', original['request_sha256'])['status'], 'unknown')
         self.assertEqual(self.repo.fence_write('period-original', original['request_sha256'])['status'], 'fenced')
         with self.assertRaisesRegex(RegistrationError, 'fenced'):
-            self.repo.freeze('period-original', self.protocol, series_key='series', require_intent=True)
-        retry = self.repo.prepare_write('period-retry', self.protocol, series_key='series', retry_of='period-original')
-        saved = self.repo.freeze('period-retry', self.protocol, series_key='series', require_intent=True)
+            self.repo.freeze('period-original', self.protocol, series_key=SERIES_KEY, require_intent=True)
+        retry = self.repo.prepare_write('period-retry', self.protocol, series_key=SERIES_KEY, retry_of='period-original')
+        saved = self.repo.freeze('period-retry', self.protocol, series_key=SERIES_KEY, require_intent=True)
         self.assertEqual(saved['protocol'], self.protocol)
         self.assertEqual(self.repo.write_status('period-retry', retry['request_sha256'])['status'], 'committed')
-        self.assertEqual(self.series.get('series')['periods'], [{'issue': '26017', 'experiment_key': 'period-retry'}])
+        self.assertEqual(self.series.get(SERIES_KEY)['periods'], [{'issue': '26017', 'experiment_key': 'period-retry'}])
         self.assertEqual(check_database(self.path)['status'], 'passed')
 
     def test_fixed_manifest_rejects_changed_parameters_seeds_and_duplicate(self):
-        self.series.create('series', self.manifest)
+        self.series.create(SERIES_KEY, self.manifest)
         bad = {**self.protocol, 'replicas': list(reversed(self.protocol['replicas']))}
         with self.assertRaisesRegex(RegistrationError, 'replica manifest'):
-            self.repo.freeze('bad-order', bad, series_key='series')
-        self.repo.freeze('period-1', self.protocol, series_key='series')
+            self.repo.freeze('bad-order', bad, series_key=SERIES_KEY)
+        self.repo.freeze('period-1', self.protocol, series_key=SERIES_KEY)
         with self.assertRaisesRegex(RegistrationError, 'already has'):
-            self.repo.freeze('other-key', self.protocol, series_key='series')
+            self.repo.freeze('other-key', self.protocol, series_key=SERIES_KEY)
         second = self.prepare_second()
         pairs = PairRepository(self.path)
         pairs.save_draft('wrong-seed', {**self.config, 'target_issue': '26018',
@@ -98,41 +103,41 @@ class SeriesTests(unittest.TestCase):
                          history_first_issue='26001', history_cutoff_issue='26016')
         wrong = {**second, 'replicas': [{'replica': 'a', 'pair_key': 'wrong-seed'}, second['replicas'][1]]}
         with self.assertRaisesRegex(RegistrationError, 'seed differs'):
-            self.repo.freeze('bad-seed', wrong, series_key='series')
+            self.repo.freeze('bad-seed', wrong, series_key=SERIES_KEY)
         with self.assertRaises(KeyError):
             self.repo.get('bad-seed')
         with self.assertRaisesRegex(RegistrationError, 'protocol differs'):
-            self.repo.freeze('bad-hypothesis', {**second, 'hypothesis': 'changed'}, series_key='series')
+            self.repo.freeze('bad-hypothesis', {**second, 'hypothesis': 'changed'}, series_key=SERIES_KEY)
 
     def test_generator_code_and_runtime_are_part_of_fixed_method(self):
-        self.series.create('series', self.manifest)
+        self.series.create(SERIES_KEY, self.manifest)
         first = PairRepository(self.path).get('pair-1')
         second = PairRepository(self.path).get('pair-2')
         for field in ('code_sha256', 'runtime', 'version'):
             changed = deepcopy(first); changed[field] = 'changed'
             with self.subTest(field=field), closing(sqlite3.connect(self.path)) as db:
                 with self.assertRaisesRegex(RegistrationError, 'configuration or seed'):
-                    validate_period(db, 'series', self.protocol,
+                    validate_period(db, SERIES_KEY, self.protocol,
                                     [{'replica': 'a', 'pair': changed}, {'replica': 'b', 'pair': second}])
 
     def test_concurrent_close_and_registration_have_one_consistent_order(self):
-        self.series.create('series', self.manifest)
+        self.series.create(SERIES_KEY, self.manifest)
         barrier = threading.Barrier(2)
         def register():
             barrier.wait()
             try:
-                self.repo.freeze('period-1', self.protocol, series_key='series')
+                self.repo.freeze('period-1', self.protocol, series_key=SERIES_KEY)
                 return 'registered'
             except RegistrationError as exc:
                 self.assertIn('closed', str(exc))
                 return 'closed'
         def close():
             barrier.wait()
-            return self.series.close('series', 'stop')
+            return self.series.close(SERIES_KEY, 'stop')
         with ThreadPoolExecutor(max_workers=2) as pool:
             a, b = pool.submit(register), pool.submit(close)
             result = a.result(timeout=15); b.result(timeout=15)
-        info = self.series.get('series')
+        info = self.series.get(SERIES_KEY)
         self.assertIsNotNone(info['closure'])
         self.assertEqual(len(info['periods']), 1 if result == 'registered' else 0)
         if result == 'closed':
@@ -142,7 +147,7 @@ class SeriesTests(unittest.TestCase):
     def test_creation_rejects_observed_issue_and_invalid_seed_schedule(self):
         bad = deepcopy(self.manifest); bad['seeds']['26018']['b'] = 3
         with self.assertRaisesRegex(RegistrationError, 'distinct'):
-            self.series.create('bad', bad)
+            self.series.create('00000000-0000-4000-8000-000000000008', bad)
         self.now = self.deadline + timedelta(hours=2)
         self.paper = PaperResults(self.path, clock=lambda: self.now)
         ticket = PairRepository(self.path).get('pair-1')['candidate']['tickets'][0]
@@ -151,64 +156,67 @@ class SeriesTests(unittest.TestCase):
                      'lotteryPromotionFlag': 0, 'verify': 1, 'prizeLevelList': []}
         self.import_draw(self.draw)
         with self.assertRaisesRegex(RegistrationError, 'already observed'):
-            self.series.create('late', self.manifest)
+            self.series.create('00000000-0000-4000-8000-000000000007', self.manifest)
 
     def test_new_schedule_rejects_unusable_seeds_before_fixing_protocol(self):
         for bad_seed in (2**32, 2**64-1):
             manifest = deepcopy(self.manifest)
             manifest['seeds']['26018']['b'] = bad_seed
             with self.subTest(seed=bad_seed), self.assertRaisesRegex(RegistrationError, '4294967295'):
-                self.series.create('invalid-seed', manifest)
+                self.series.create('00000000-0000-4000-8000-000000000005', manifest)
             with self.assertRaises(KeyError):
-                self.series.get('invalid-seed')
+                self.series.get('00000000-0000-4000-8000-000000000005')
         valid = deepcopy(self.manifest)
         valid['seeds']['26018']['b'] = 2**32-1
-        self.series.create('maximum-valid', valid)
-        self.assertEqual(self.series.get('maximum-valid')['unsupported_seed_issues'], [])
+        self.series.create('00000000-0000-4000-8000-000000000004', valid)
+        self.assertEqual(self.series.get('00000000-0000-4000-8000-000000000004')['unsupported_seed_issues'], [])
 
     def test_legacy_oversized_seed_is_readable_and_idempotent(self):
-        content = self.series.create('legacy', self.manifest)
+        series_id = LEGACY_SERIES_KEY
+        content = self.series.create(series_id, self.manifest)
         original = deepcopy(content)
         original['manifest']['seeds']['26018']['b'] = 2**64-1
         raw = _canonical(original)
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('DROP TRIGGER experiment_series_no_update')
             db.execute('UPDATE experiment_series SET content_sha256=?,content_json=? WHERE series_key=?',
-                       (hashlib.sha256(raw).hexdigest(), raw, 'legacy'))
+                       (hashlib.sha256(raw).hexdigest(), raw, series_id))
             db.execute("CREATE TRIGGER experiment_series_no_update BEFORE UPDATE ON experiment_series BEGIN SELECT RAISE(ABORT, 'immutable experiment series'); END")
-        info = self.series.get('legacy')
+        info = self.series.get(series_id)
         self.assertEqual(info['unsupported_seed_issues'], ['26018'])
         self.assertEqual(info['content'], original)
-        self.assertEqual(self.series.create('legacy', original['manifest']), original)
+        self.assertEqual(self.series.create(series_id, self.manifest), content)
         with self.assertRaisesRegex(RegistrationError, 'different protocol'):
-            self.series.create('legacy', self.manifest)
-        self.assertEqual(self.series.get('legacy')['content'], original)
+            self.series.create(series_id, {**self.manifest, 'hypothesis': 'different protocol'})
+        self.assertEqual(self.series.get(series_id)['content'], original)
 
     def test_largest_valid_seed_generates_and_registers_future_pair(self):
         manifest = deepcopy(self.manifest)
         manifest['seeds']['26018']['b'] = 2**32-1
-        self.series.create('maximum-seed', manifest)
-        self.repo.freeze('period-1', self.protocol, series_key='maximum-seed')
+        self.series.create(MAX_SEED_SERIES_KEY, manifest)
+        self.repo.freeze('period-1', self.protocol, series_key=MAX_SEED_SERIES_KEY)
         second = self.prepare_second()
         PairRepository(self.path).save_draft('maximum-pair', {**self.config, 'target_issue': '26018',
              'target_date': (self.deadline+timedelta(days=1)).date().isoformat(), 'seed': 2**32-1},
              history_first_issue='26001', history_cutoff_issue='26016')
         second['replicas'][1]['pair_key'] = 'maximum-pair'
-        result = self.repo.freeze('period-2', second, series_key='maximum-seed')
+        result = self.repo.freeze('period-2', second, series_key=MAX_SEED_SERIES_KEY)
         self.assertEqual(result['pairs'][1]['pair']['config']['seed'], 2**32-1)
 
     def test_first_deadline_is_rechecked_before_series_commit(self):
-        times = iter([self.now, self.deadline])
+        # Series creation timestamps its prepared request before validating the
+        # calendar, then rechecks the clock immediately before commit.
+        times = iter([self.now, self.now, self.deadline])
         changing = SeriesRepository(self.path, clock=lambda: next(times))
         with self.assertRaisesRegex(RegistrationError, 'deadline reached'):
-            changing.create('late-commit', self.manifest)
+            changing.create('00000000-0000-4000-8000-000000000006', self.manifest)
         with self.assertRaises(KeyError):
-            self.series.get('late-commit')
+            self.series.get('00000000-0000-4000-8000-000000000006')
 
     def test_closed_series_still_settles_its_already_fixed_period(self):
-        self.series.create('series', self.manifest)
-        self.repo.freeze('period-1', self.protocol, series_key='series')
-        self.series.close('series', 'no further registrations')
+        self.series.create(SERIES_KEY, self.manifest)
+        self.repo.freeze('period-1', self.protocol, series_key=SERIES_KEY)
+        self.series.close(SERIES_KEY, 'no further registrations')
         self.now = self.deadline + timedelta(hours=2)
         self.paper = PaperResults(self.path, clock=lambda: self.now)
         ticket = PairRepository(self.path).get('pair-1')['candidate']['tickets'][0]
@@ -216,16 +224,19 @@ class SeriesTests(unittest.TestCase):
                      'lotteryDrawResult': ' '.join(map(str, ticket['front']+ticket['back'])),
                      'lotteryPromotionFlag': 0, 'verify': 1,
                      'prizeLevelList': [{'sort': 101, 'stakeAmount': '6000'}, {'sort': 201, 'stakeAmount': '100'},
-                                        {'sort': 301, 'stakeAmount': '5000'}, {'sort': 401, 'stakeAmount': '200'}]}
+                                        {'sort': 301, 'stakeAmount': '5000'}, {'sort': 401, 'stakeAmount': '200'},
+                                        {'sort': 501, 'stakeAmount': '1000'}, {'sort': 601, 'stakeAmount': '500'},
+                                        {'sort': 701, 'stakeAmount': '300'}, {'sort': 801, 'stakeAmount': '200'},
+                                        {'sort': 901, 'stakeAmount': '100'}]}
         snapshot = self.import_draw(self.draw)
         results = self.paper.process_snapshot(snapshot)
         self.assertEqual(results['period-1']['status'], 'complete')
         self.assertEqual(self.paper.inspect_current('period-1')['status'], 'locally_attested')
-        self.assertEqual(self.series.get('series')['closure']['reason'], 'no further registrations')
+        self.assertEqual(self.series.get(SERIES_KEY)['closure']['reason'], 'no further registrations')
         previous = results['period-1']['group_id']
         rule = deepcopy(self.repo.get('period-1')['rule_review']['extracted'])
         rule['version'] = 'corrected-v2'
-        rule['payout_sort_map'] = {'first': '301', 'first-extra': '401', 'second': '101', 'second-extra': '201'}
+        rule = fixtures.swap_first_second_prize_codes(rule)
         replacement = self.review('rule', rule)
         correction = self.repo.declare_source_correction(self.rule_id, replacement, note='synthetic fix', confirmed=True)
         self.assertEqual(self.paper.inspect_current('period-1')['status'], 'review_required')
@@ -233,7 +244,7 @@ class SeriesTests(unittest.TestCase):
         self.assertEqual(outcome['details']['period-1']['status'], 'complete')
         self.assertNotEqual(previous, self.paper.inspect_current('period-1')['group_id'])
         self.assertEqual(len(self.paper.list_history('period-1')['publications']), 2)
-        self.assertIsNotNone(self.series.get('series')['closure'])
+        self.assertIsNotNone(self.series.get(SERIES_KEY)['closure'])
 
 
 if __name__ == '__main__':

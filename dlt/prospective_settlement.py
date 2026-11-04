@@ -38,6 +38,16 @@ def _sha(value):
     return hashlib.sha256(value).hexdigest()
 
 
+def _verified_promotion_data(raw, issue):
+    from dlt.historical_scenarios import promotion_data
+    try:
+        return promotion_data(raw, issue)
+    except ScenarioError as exc:
+        if str(exc) == '派奖标记与已核对的 2026 活动期号范围不一致':
+            raise PaperResultError('promotion eligibility does not match the verified activity issue range') from exc
+        raise PaperResultError(str(exc)) from exc
+
+
 @exact_money_context
 def _calculate_results(content, issue, raw, rule):
     """Reconstruct every fixed pair from the retained draw and reviewed rule."""
@@ -46,13 +56,7 @@ def _calculate_results(content, issue, raw, rule):
     except ValueError as exc:
         raise PaperResultError(str(exc)) from exc
     payouts = PaperResults._payouts(rule, raw)
-    from dlt.historical_scenarios import promotion_data
-    try:
-        promotion, promotion_payouts = promotion_data(raw, issue)
-    except ScenarioError as exc:
-        if str(exc) == '派奖标记与已核对的 2026 活动期号范围不一致':
-            raise PaperResultError('promotion eligibility does not match the verified activity issue range') from exc
-        raise PaperResultError(str(exc)) from exc
+    promotion, promotion_payouts = _verified_promotion_data(raw, issue)
     if promotion and rule.get('promotion_policy') != 'official_draw_fields_and_ticket_group_threshold':
         raise PaperResultError('reviewed rule does not declare the active promotion ticket-group policy')
     if not promotion and rule.get('promotion_policy') not in (None, 'excluded'):
@@ -718,6 +722,7 @@ class PaperResults:
                     raise PaperResultError('snapshot is not the reviewed current draw version')
                 if datetime.fromisoformat(raw['lotteryDrawTime']).date().isoformat() != calendar_review['extracted']['draw_date']:
                     raise PaperResultError('draw date differs from fixed calendar')
+                promotion, promotion_payouts = _verified_promotion_data(raw, issue)
                 payouts, results, average = _calculate_results(content, issue, raw, rule)
                 payload = {'experiment_key': experiment_key, 'experiment_sha256': current_row[1], 'issue': issue,
                            'row_sha256': row_hash, 'source_snapshot_id': snapshot_id, 'source_url': source,

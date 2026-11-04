@@ -21,6 +21,7 @@ from dlt.scheduler import Scheduler
 from dlt.snapshots import SnapshotStore
 from test_scheduler import configuration
 import test_prospective as fixtures
+from test_prospective import swap_first_second_prize_codes
 
 
 OFFICIAL_ENDPOINT = 'https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry?gameNo=85&provinceId=0&pageSize=20&isVerify=1&pageNo=1'
@@ -39,7 +40,10 @@ class PaperResultsTests(unittest.TestCase):
         self.draw = {'lotteryGameNum': '85', 'lotteryDrawNum': '26017', 'lotteryDrawTime': self.calendar['draw_date'],
                      'lotteryDrawResult': numbers, 'lotteryPromotionFlag': 0, 'verify': 1,
                      'prizeLevelList': [{'sort': 101, 'stakeAmount': '6000'}, {'sort': 201, 'stakeAmount': '100'},
-                                        {'sort': 301, 'stakeAmount': '5000'}, {'sort': 401, 'stakeAmount': '200'}]}
+                                        {'sort': 301, 'stakeAmount': '5000'}, {'sort': 401, 'stakeAmount': '200'},
+                                        {'sort': 501, 'stakeAmount': '1000'}, {'sort': 601, 'stakeAmount': '500'},
+                                        {'sort': 701, 'stakeAmount': '300'}, {'sort': 801, 'stakeAmount': '200'},
+                                        {'sort': 901, 'stakeAmount': '100'}]}
 
     def import_draw(self, row, *, source=OFFICIAL_ENDPOINT, observed=None):
         payload = {'success': True, 'errorCode': '0', 'value': {'list': [row]}}
@@ -412,7 +416,7 @@ class PaperResultsTests(unittest.TestCase):
         old = self.paper.process_one('exp', sid)
         corrected = deepcopy(self.frozen['rule_review']['extracted'])
         corrected['version'] = 'corrected-rule-v2'
-        corrected['payout_sort_map'] = {'first': '301', 'first-extra': '401', 'second': '101', 'second-extra': '201'}
+        corrected = swap_first_second_prize_codes(corrected)
         new_id = self.review('rule', corrected)
         resolution = self.repo.declare_source_correction(self.rule_id, new_id, note='corrected mapping', confirmed=True)
         self.assertEqual(resolution['kind'], 'rule')
@@ -454,12 +458,10 @@ class PaperResultsTests(unittest.TestCase):
         rule_id = self.review('rule', new_rule)
         self.repo.declare_source_correction(self.rule_id, rule_id, note='matching tax correction', confirmed=True)
         corrected = self.paper.process_one('exp', sid)
-        self.assertEqual(corrected['status'], 'complete')
-        self.assertNotEqual(old['group_id'], corrected['group_id'])
-        self.assertEqual(corrected['result']['tax_review_id'], tax_id)
-        self.assertEqual(corrected['result']['rule_review_id'], rule_id)
-        self.assertNotEqual(old['result']['replicas'][0]['candidate']['tax'],
-                            corrected['result']['replicas'][0]['candidate']['tax'])
+        self.assertEqual(corrected['status'], 'blocked')
+        self.assertIn('current DLT tax rule', corrected['reason'])
+        self.assertEqual(self.paper.get_group(old['group_id']), old['result'])
+        self.assertEqual(self.paper.inspect_current('exp')['status'], 'review_required')
 
     def test_invalid_or_conflicting_source_corrections_are_rejected(self):
         new_rule = deepcopy(self.frozen['rule_review']['extracted'])
@@ -504,7 +506,7 @@ class PaperResultsTests(unittest.TestCase):
         old = self.paper.process_one('exp', sid)
         rule = deepcopy(self.frozen['rule_review']['extracted'])
         rule['version'] = 'recovered-rule-v2'
-        rule['payout_sort_map'] = {'first': '301', 'first-extra': '401', 'second': '101', 'second-extra': '201'}
+        rule = swap_first_second_prize_codes(rule)
         new_id = self.review('rule', rule)
         correction = self.repo.declare_source_correction(self.rule_id, new_id, note='reviewed', confirmed=True)
         ident = correction['correction_id']
@@ -544,8 +546,9 @@ class PaperResultsTests(unittest.TestCase):
         rule_id = self.review('rule', rule)
         second = self.repo.declare_source_correction(self.rule_id, rule_id, note='matching rule', confirmed=True)
         outcome = self.paper.process_source_correction(second['correction_id'])
-        self.assertEqual(outcome['details']['exp']['status'], 'complete')
-        self.assertEqual(self.paper.inspect_current('exp')['result']['tax_review_id'], tax_id)
+        self.assertEqual(outcome['details']['exp']['status'], 'blocked')
+        self.assertIn('current DLT tax rule', outcome['details']['exp']['reason'])
+        self.assertEqual(self.paper.inspect_current('exp')['status'], 'review_required')
 
     def test_source_correction_unexpected_failure_is_recorded_and_retryable(self):
         draw = deepcopy(self.draw)

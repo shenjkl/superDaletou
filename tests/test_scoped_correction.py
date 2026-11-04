@@ -11,6 +11,8 @@ from dlt.prospective import RegistrationError
 from dlt.recovery import RecoveryError, prepare_isolated_copy
 from dlt.scheduler import Scheduler
 import test_series_report as fixtures
+import test_prospective_series as series_fixtures
+from test_prospective import swap_first_second_prize_codes
 
 
 class ScopedCorrectionTests(unittest.TestCase):
@@ -25,7 +27,7 @@ class ScopedCorrectionTests(unittest.TestCase):
     def complete_both(self):
         self.start()
         second = self.prepare_second()
-        self.repo.freeze('period-2', second, series_key='series')
+        self.repo.freeze('period-2', second, series_key=series_fixtures.SERIES_KEY)
         self.now = self.deadline+timedelta(days=1, hours=2)
         _, first = self.settle('period-1', '26017', self.calendar['draw_date'], 'pair-1')
         _, second_result = self.settle('period-2', '26018', (self.deadline+timedelta(days=1)).date().isoformat(), 'next-3')
@@ -35,7 +37,7 @@ class ScopedCorrectionTests(unittest.TestCase):
         old_id = old_id or self.rule_id
         rule = deepcopy(self.repo._get_review(self._db(), old_id, 'rule')['extracted'])
         rule['version'] = version
-        rule['payout_sort_map'] = {'first': '301', 'first-extra': '401', 'second': '101', 'second-extra': '201'}
+        rule = swap_first_second_prize_codes(rule)
         return self.review('rule', rule)
 
     def test_rule_correction_affects_only_selected_issue_and_preserves_history(self):
@@ -45,7 +47,7 @@ class ScopedCorrectionTests(unittest.TestCase):
         self.assertEqual(correction['scope'], 'issue')
         self.assertEqual(self.paper.inspect_current('period-1')['status'], 'review_required')
         self.assertEqual(self.paper.inspect_current('period-2')['group_id'], second['group_id'])
-        report = self.series.describe('series')
+        report = self.series.describe(series_fixtures.SERIES_KEY)
         self.assertEqual((report['valid'], report['counts']['review_required']), (1, 1))
         processed = self.paper.process_source_correction(correction['correction_id'], scope='issue')
         self.assertEqual(set(processed['details']), {'period-1'})
@@ -54,7 +56,7 @@ class ScopedCorrectionTests(unittest.TestCase):
         self.assertEqual(current['result']['rule_review_id'], new)
         self.assertEqual(self.paper.get_group(first['group_id']), first['result'])
         self.assertEqual(self.paper.inspect_current('period-2')['group_id'], second['group_id'])
-        self.assertEqual(self.series.describe('series')['valid'], 2)
+        self.assertEqual(self.series.describe(series_fixtures.SERIES_KEY)['valid'], 2)
         self.paper.process_source_correction(correction['correction_id'], scope='issue', retry=True)
         self.assertEqual(len(self.paper.list_history('period-1')['publications']), 2)
         self.assertEqual(len(self.paper.list_history('period-2')['publications']), 1)
@@ -86,8 +88,10 @@ class ScopedCorrectionTests(unittest.TestCase):
         rule['tax'] = tax['tax']; rule['version'] = 'matching-scoped-tax'
         new_rule = self.review('rule', rule)
         correction = self.repo.declare_scoped_source_correction(self.rule_id, new_rule, issue='26017', note='fixture', confirmed=True)
-        self.assertEqual(self.paper.process_source_correction(correction['correction_id'], scope='issue')['details']['period-1']['status'], 'complete')
-        self.assertEqual(self.paper.inspect_current('period-1')['result']['tax_review_id'], new_tax)
+        corrected = self.paper.process_source_correction(correction['correction_id'], scope='issue')
+        self.assertEqual(corrected['details']['period-1']['status'], 'blocked')
+        self.assertIn('current DLT tax rule', corrected['details']['period-1']['reason'])
+        self.assertEqual(self.paper.inspect_current('period-1')['status'], 'review_required')
         self.assertEqual(self.paper.inspect_current('period-2')['group_id'], second['group_id'])
 
     def test_global_then_issue_correction_follows_single_chain(self):
