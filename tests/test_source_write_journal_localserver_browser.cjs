@@ -28,6 +28,8 @@ test('real Chrome restores a lost source-review response after LocalServer proce
   let serverProcess;
   let chromeProcess;
   let socket;
+  let secondSocket;
+  let browserSocket;
   let serverOutput = '';
   try {
     const port = await new Promise((resolve, reject) => {
@@ -99,56 +101,108 @@ test('real Chrome restores a lost source-review response after LocalServer proce
     const page = targets.find(target => target.type === 'page' && target.url === origin + '/');
     assert.ok(page?.webSocketDebuggerUrl, 'application page target was not found');
 
-    socket = new WebSocket(page.webSocketDebuggerUrl);
-    await new Promise((resolve, reject) => {
-      socket.addEventListener('open', resolve, { once: true });
-      socket.addEventListener('error', reject, { once: true });
-    });
-    let nextId = 1;
-    const pending = new Map();
-    const send = (method, params = {}) => new Promise((resolve, reject) => {
-      const id = nextId++;
-      pending.set(id, { resolve, reject });
-      socket.send(JSON.stringify({ id, method, params }));
-    });
+    const connectDevtools = async url => {
+      const ws = new WebSocket(url);
+      await new Promise((resolve, reject) => {
+        ws.addEventListener('open', resolve, { once: true });
+        ws.addEventListener('error', reject, { once: true });
+      });
+      let nextId = 1;
+      const pending = new Map();
+      ws.addEventListener('message', event => {
+        const message = JSON.parse(event.data);
+        if (!message.id || !pending.has(message.id)) return;
+        const handlers = pending.get(message.id);
+        pending.delete(message.id);
+        message.error ? handlers.reject(new Error(message.error.message)) : handlers.resolve(message.result);
+      });
+      const send = (method, params = {}) => new Promise((resolve, reject) => {
+        const id = nextId++;
+        pending.set(id, { resolve, reject });
+        ws.send(JSON.stringify({ id, method, params }));
+      });
+      return { socket: ws, send };
+    };
+    const firstConnection = await connectDevtools(page.webSocketDebuggerUrl);
+    socket = firstConnection.socket;
+    const send = firstConnection.send;
     let shouldDrop = false;
+    let sourceReviewPostResponses = 0;
     let resolvePaused;
     const pausedResponse = new Promise(resolve => { resolvePaused = resolve; });
     socket.addEventListener('message', event => {
       const message = JSON.parse(event.data);
-      if (message.id && pending.has(message.id)) {
-        const handlers = pending.get(message.id);
-        pending.delete(message.id);
-        message.error ? handlers.reject(new Error(message.error.message)) : handlers.resolve(message.result);
-      }
       if (message.method === 'Fetch.requestPaused') {
         const params = message.params;
-        if (shouldDrop && params.request.method === 'POST' && params.request.url.includes('/api/source-reviews')
+        if (params.request.method === 'POST' && params.request.url.includes('/api/source-reviews')
             && params.responseStatusCode === 200) {
-          shouldDrop = false;
-          resolvePaused(params);
-        } else {
-          send('Fetch.continueRequest', { requestId: params.requestId }).catch(() => {});
+          sourceReviewPostResponses++;
+          if (shouldDrop) {
+            shouldDrop = false;
+            resolvePaused(params);
+            return;
+          }
         }
+        send('Fetch.continueRequest', { requestId: params.requestId }).catch(() => {});
       }
     });
     const evaluate = async expression => {
       const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-      if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
+      if (result.exceptionDetails) throw new Error(result.result?.exception?.description || result.exceptionDetails.text);
       return result.result.value;
     };
     await send('Runtime.enable');
     await send('Fetch.enable', { patterns: [{ urlPattern: '*://127.0.0.1/*/api/source-reviews*', requestStage: 'Response' },
       { urlPattern: `${origin}/api/source-reviews*`, requestStage: 'Response' }] });
-    const waitForPage = async () => {
+    const waitForPage = async (evaluatePage = evaluate) => {
       for (let i = 0; i < 200; i++) {
-        if (await evaluate('document.readyState') === 'complete'
-            && await evaluate('Boolean(window.SourceWriteJournal)')) return;
+        if (await evaluatePage('document.readyState') === 'complete'
+            && await evaluatePage('Boolean(window.SourceWriteJournal)')) return;
         await new Promise(resolve => setTimeout(resolve, 50));
       }
       throw new Error('application or source journal did not load in Chrome');
     };
-    await waitForPage();
+    await waitForPage(evaluate);
+
+    const version = await (await fetch(`http://127.0.0.1:${devtoolsPort}/json/version`)).json();
+    const browserConnection = await connectDevtools(version.webSocketDebuggerUrl);
+    browserSocket = browserConnection.socket;
+    const { targetId } = await browserConnection.send('Target.createTarget', { url: `${origin}/#prospective` });
+    let secondPage;
+    for (let i = 0; i < 100; i++) {
+      const currentTargets = await (await fetch(`http://127.0.0.1:${devtoolsPort}/json/list`)).json();
+      secondPage = currentTargets.find(target => target.id === targetId && target.type === 'page');
+      if (secondPage?.webSocketDebuggerUrl) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    assert.ok(secondPage?.webSocketDebuggerUrl, 'second same-profile Chrome page was not created');
+    const secondConnection = await connectDevtools(secondPage.webSocketDebuggerUrl);
+    secondSocket = secondConnection.socket;
+    const sendSecond = secondConnection.send;
+    secondSocket.addEventListener('message', event => {
+      const message = JSON.parse(event.data);
+      if (message.method === 'Fetch.requestPaused') {
+        const params = message.params;
+        if (params.request.method === 'POST' && params.request.url.includes('/api/source-reviews')
+            && params.responseStatusCode === 200) sourceReviewPostResponses++;
+        sendSecond('Fetch.continueRequest', { requestId: params.requestId }).catch(() => {});
+      }
+    });
+    const evaluateSecond = async expression => {
+      const result = await sendSecond('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+      if (result.exceptionDetails) throw new Error(result.result?.exception?.description || result.exceptionDetails.text);
+      return result.result.value;
+    };
+    await sendSecond('Runtime.enable');
+    await sendSecond('Fetch.enable', { patterns: [{ urlPattern: '*://127.0.0.1/*/api/source-reviews*', requestStage: 'Response' },
+      { urlPattern: `${origin}/api/source-reviews*`, requestStage: 'Response' }] });
+    await waitForPage(evaluateSecond);
+    for (let i = 0; i < 300; i++) {
+      if (await evaluateSecond("Boolean(document.querySelector('#review-form') && document.body.dataset.serverStatus==='verified')")) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(await evaluateSecond("Boolean(document.querySelector('#review-form') && document.body.dataset.serverStatus==='verified')"), true,
+      'second same-profile page did not connect to the local service');
     await evaluate(`document.querySelector('#navigation a[href="#prospective"]').click()`);
     for (let i = 0; i < 300; i++) {
       if (await evaluate("Boolean(document.querySelector('#review-form') && document.body.dataset.serverStatus==='verified')")) break;
@@ -164,8 +218,11 @@ test('real Chrome restores a lost source-review response after LocalServer proce
     const fileInput = await send('DOM.querySelector', { nodeId: documentTree.root.nodeId, selector: '#review-file' });
     assert.ok(fileInput.nodeId, 'product source file input was not found');
     await send('DOM.setFileInputFiles', { nodeId: fileInput.nodeId, files: [documentPath] });
-    shouldDrop = true;
-    await evaluate(`(() => {
+    const secondDocumentTree = await sendSecond('DOM.getDocument', { depth: -1 });
+    const secondFileInput = await sendSecond('DOM.querySelector', { nodeId: secondDocumentTree.root.nodeId, selector: '#review-file' });
+    assert.ok(secondFileInput.nodeId, 'second product source file input was not found');
+    await sendSecond('DOM.setFileInputFiles', { nodeId: secondFileInput.nodeId, files: [documentPath] });
+    const fillAndSubmitForm = `(() => {
       const form=document.querySelector('#review-form');
       form.closest('details').open=true;
       form.elements.kind.value='calendar';
@@ -174,7 +231,9 @@ test('real Chrome restores a lost source-review response after LocalServer proce
       form.elements.note.value='synthetic browser integration only';
       form.elements.confirmed.checked=true;
       form.requestSubmit();
-    })()`);
+    })()`;
+    shouldDrop = true;
+    await evaluate(fillAndSubmitForm);
     let responseTimer;
     const responseTimedOut = new Promise((_, reject) => {
       responseTimer = setTimeout(() => reject(new Error('source review did not reach the real server')), 30000);
@@ -182,7 +241,28 @@ test('real Chrome restores a lost source-review response after LocalServer proce
     const paused = await Promise.race([pausedResponse, responseTimedOut]);
     clearTimeout(responseTimer);
     assert.equal(paused.responseStatusCode, 200);
+
+    await evaluateSecond(fillAndSubmitForm);
+    let secondWaiting = false;
+    for (let i = 0; i < 100; i++) {
+      secondWaiting = await evaluateSecond("document.querySelector('#review-form button[type=submit]')?.disabled===true");
+      if (secondWaiting) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    assert.equal(secondWaiting, true, 'second tab did not remain inside the same-object browser lock');
+    await new Promise(resolve => setTimeout(resolve, 300));
+    assert.equal(sourceReviewPostResponses, 1, 'second tab sent a duplicate source-review POST while the first held the lock');
+
     await send('Fetch.failRequest', { requestId: paused.requestId, errorReason: 'ConnectionReset' });
+    let secondFinished = false;
+    for (let i = 0; i < 300; i++) {
+      secondFinished = await evaluateSecond("document.querySelector('#review-form button[type=submit]')?.disabled===false");
+      if (secondFinished) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(secondFinished, true, 'second tab did not finish after the first request released the lock');
+    assert.equal(sourceReviewPostResponses, 1, 'same-object second tab did not reuse the original accepted request');
+
     let submitted;
     for (let i = 0; i < 300; i++) {
       submitted = await evaluate(`(async()=>({error:document.querySelector('#review-error')?.textContent||'',entries:await new Promise((resolve,reject)=>{
@@ -243,6 +323,8 @@ test('real Chrome restores a lost source-review response after LocalServer proce
     assert.equal(remainder.length, 0, 'product recovery UI did not clear the verified local copy');
   } finally {
     try { socket?.close(); } catch {}
+    try { secondSocket?.close(); } catch {}
+    try { browserSocket?.close(); } catch {}
     for (const process of [chromeProcess, serverProcess]) {
       if (process && process.exitCode === null) {
         process.kill();
