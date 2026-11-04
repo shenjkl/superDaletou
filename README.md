@@ -6,7 +6,7 @@
 
 需要 Python 3.12 和 [requirements.txt](requirements.txt) 中的 NumPy、pypdfium2、Pillow 与 cryptography。已验证环境为 Windows、Python 3.12.14、NumPy 2.3.5、pypdfium2 5.14.0、Pillow 12.3.0 和 cryptography 50.0.2；使用其他环境前请先安装并验证依赖。PDF 查看在独立限额进程中逐页生成图像；相关许可证及 PDFium 依赖见 [pypdfium2 项目说明](https://github.com/pypdfium2-team/pypdfium2)。项目不包含 Python 运行时。
 
-Windows 可在项目目录准备独立虚拟环境并安装固定版本依赖：
+Windows 需先安装 Python 3.12。初始化脚本优先使用 `py -3.12`，若 Python Launcher 不可用则尝试 PATH 中的 `python`：
 
 ```powershell
 .\setup-local.ps1

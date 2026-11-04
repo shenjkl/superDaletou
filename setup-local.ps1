@@ -8,17 +8,33 @@ $requirements = Join-Path $projectRoot 'requirements.txt'
 
 Push-Location $projectRoot
 try {
-    if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
-        throw '未找到 Windows Python Launcher（py）。请先安装 Python 3.12，并启用 Python Launcher。'
+    $basePython = $null
+    $basePythonPrefix = @()
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        & py -3.12 -c "import sys; print(sys.version.split()[0])" *> $null
+        if ($LASTEXITCODE -eq 0) {
+            $basePython = 'py'
+            $basePythonPrefix = @('-3.12')
+        }
     }
 
-    & py -3.12 -c "import sys; print(sys.version.split()[0])"
-    if ($LASTEXITCODE -ne 0) {
-        throw '未找到可用的 Python 3.12。请安装 Python 3.12 后重新运行本脚本。'
+    if (-not $basePython) {
+        $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+        if ($pythonCommand) {
+            $version = & $pythonCommand.Source -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
+            if ($LASTEXITCODE -eq 0 -and $version.Trim() -eq '3.12') {
+                $basePython = $pythonCommand.Source
+            }
+        }
+    }
+
+    if (-not $basePython) {
+        throw '未找到 Python 3.12。请安装 Python 3.12；脚本会优先使用 py -3.12，也可使用 PATH 中的 python 命令。'
     }
 
     if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
-        & py -3.12 -m venv $pythonEnvironment
+        $venvArguments = @($basePythonPrefix) + @('-m', 'venv', $pythonEnvironment)
+        & $basePython @venvArguments
         if ($LASTEXITCODE -ne 0) {
             throw '创建项目虚拟环境失败。'
         }
