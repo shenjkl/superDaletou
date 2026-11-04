@@ -127,9 +127,13 @@ test('real Chrome restores a lost source-review response after LocalServer proce
     socket = firstConnection.socket;
     const send = firstConnection.send;
     let shouldDrop = false;
+    let shouldDropCorrection = false;
     let sourceReviewPostResponses = 0;
+    let sourceCorrectionPostResponses = 0;
     let resolvePaused;
+    let resolveCorrectionPaused;
     const pausedResponse = new Promise(resolve => { resolvePaused = resolve; });
+    const pausedCorrectionResponse = new Promise(resolve => { resolveCorrectionPaused = resolve; });
     socket.addEventListener('message', event => {
       const message = JSON.parse(event.data);
       if (message.method === 'Fetch.requestPaused') {
@@ -143,6 +147,14 @@ test('real Chrome restores a lost source-review response after LocalServer proce
             return;
           }
         }
+        if (params.request.method === 'POST' && params.request.url.includes('/api/source-corrections')) {
+          if (shouldDropCorrection) {
+            sourceCorrectionPostResponses++;
+            shouldDropCorrection = false;
+            resolveCorrectionPaused(params);
+            return;
+          }
+        }
         send('Fetch.continueRequest', { requestId: params.requestId }).catch(() => {});
       }
     });
@@ -152,8 +164,10 @@ test('real Chrome restores a lost source-review response after LocalServer proce
       return result.result.value;
     };
     await send('Runtime.enable');
-    await send('Fetch.enable', { patterns: [{ urlPattern: '*://127.0.0.1/*/api/source-reviews*', requestStage: 'Response' },
-      { urlPattern: `${origin}/api/source-reviews*`, requestStage: 'Response' }] });
+    const sourceWritePatterns = ['source-reviews', 'source-corrections'].map(route => ({
+      urlPattern: `${origin}/api/${route}*`, requestStage: 'Response',
+    }));
+    await send('Fetch.enable', { patterns: sourceWritePatterns });
     const waitForPage = async (evaluatePage = evaluate) => {
       for (let i = 0; i < 200; i++) {
         if (await evaluatePage('document.readyState') === 'complete'
@@ -194,8 +208,7 @@ test('real Chrome restores a lost source-review response after LocalServer proce
       return result.result.value;
     };
     await sendSecond('Runtime.enable');
-    await sendSecond('Fetch.enable', { patterns: [{ urlPattern: '*://127.0.0.1/*/api/source-reviews*', requestStage: 'Response' },
-      { urlPattern: `${origin}/api/source-reviews*`, requestStage: 'Response' }] });
+    await sendSecond('Fetch.enable', { patterns: sourceWritePatterns });
     await waitForPage(evaluateSecond);
     for (let i = 0; i < 300; i++) {
       if (await evaluateSecond("Boolean(document.querySelector('#review-form') && document.body.dataset.serverStatus==='verified')")) break;
@@ -225,7 +238,7 @@ test('real Chrome restores a lost source-review response after LocalServer proce
     const fillAndSubmitForm = `(() => {
       const form=document.querySelector('#review-form');
       form.closest('details').open=true;
-      form.elements.kind.value='calendar';
+      form.elements.kind.value='rule';
       form.elements.url.value='https://www.sporttery.cn/synthetic-test';
       form.elements.extracted.value=JSON.stringify({synthetic:'only'});
       form.elements.note.value='synthetic browser integration only';
@@ -321,6 +334,153 @@ test('real Chrome restores a lost source-review response after LocalServer proce
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     assert.equal(remainder.length, 0, 'product recovery UI did not clear the verified local copy');
+
+    const replacementBytes = Buffer.from('synthetic corrected source document', 'utf8');
+    const replacementPath = path.join(dataDirectory, 'browser-source-replacement.txt');
+    fs.writeFileSync(replacementPath, replacementBytes);
+    const replacementTree = await send('DOM.getDocument', { depth: -1 });
+    const replacementInput = await send('DOM.querySelector', { nodeId: replacementTree.root.nodeId, selector: '#review-file' });
+    await send('DOM.setFileInputFiles', { nodeId: replacementInput.nodeId, files: [replacementPath] });
+    await evaluate(`(() => {
+      const form=document.querySelector('#review-form');
+      form.closest('details').open=true;
+      form.elements.kind.value='rule';
+      form.elements.url.value='https://www.sporttery.cn/synthetic-correction';
+      form.elements.extracted.value=JSON.stringify({synthetic:'corrected'});
+      form.elements.note.value='synthetic replacement source for correction flow';
+      form.elements.confirmed.checked=true;
+      form.requestSubmit();
+    })()`);
+    const replacementSha256 = createHash('sha256').update(replacementBytes).digest('hex');
+    let replacementReview;
+    for (let i = 0; i < 300; i++) {
+      const current = await evaluate("fetch('/api/source-reviews',{credentials:'same-origin'}).then(response=>response.json())");
+      replacementReview = current.reviews.find(review => review.document_sha256 === replacementSha256);
+      if (replacementReview && sourceReviewPostResponses === 2) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.ok(replacementReview?.review_id, 'product form did not save the replacement source review');
+    assert.equal(sourceReviewPostResponses, 2, 'replacement source review was not posted exactly once');
+    const originalReview = matchingReviews[0];
+    const replacementJournalEntry = await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.open('dlt-source-write-journal',1);
+      request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+        get.onsuccess=()=>{db.close();resolve(get.result.find(item=>item.operation==='source_review'&&item.request.document_sha256==='${replacementSha256}'))};
+        get.onerror=()=>{db.close();reject(get.error)}}})`);
+    assert.equal(replacementJournalEntry?.phase, 'accepted');
+    let replacementDismissReady = false;
+    for (let i = 0; i < 100; i++) {
+      replacementDismissReady = await evaluate(`Boolean(document.querySelector('#source-write-journal [data-source-write="dismiss"][data-request="${replacementJournalEntry.request_key}"]'))`);
+      if (replacementDismissReady) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(replacementDismissReady, true, 'product UI did not render the accepted replacement review action');
+    await evaluate(`document.querySelector('#source-write-journal [data-source-write="dismiss"][data-request="${replacementJournalEntry.request_key}"]').click()`);
+    let replacementRemainder;
+    for (let i = 0; i < 100; i++) {
+      replacementRemainder = await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.open('dlt-source-write-journal',1);
+        request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      if (!replacementRemainder.length) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(replacementRemainder.length, 0);
+
+    await evaluate(`document.querySelector('#source-correction-section [data-action="prepare-source-correction"]').click()`);
+    for (let i = 0; i < 100; i++) {
+      if (await evaluate("Boolean(document.querySelector('#source-correction-form'))")) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    shouldDropCorrection = true;
+    await evaluate(`(() => {
+      const form=document.querySelector('#source-correction-form');
+      form.elements.old.value='${originalReview.review_id}';
+      form.elements.old.dispatchEvent(new Event('change',{bubbles:true}));
+      form.elements.new.value='${replacementReview.review_id}';
+      form.elements.new.dispatchEvent(new Event('change',{bubbles:true}));
+      form.elements.scope.value='global';
+      form.elements.note.value='synthetic end-to-end source correction';
+      form.elements.confirmed.checked=true;
+      form.requestSubmit();
+    })()`);
+    const correctionFormState = await evaluate(`(() => {
+      const form=document.querySelector('#source-correction-form');
+      return {exists:!!form,valid:form?.checkValidity(),old:form?.elements.old.value,new:form?.elements.new.value,
+        scope:form?.elements.scope.value,note:form?.elements.note.value,confirmed:form?.elements.confirmed.checked,
+        error:form?.querySelector('#correction-error')?.textContent||'',ready:document.body.dataset.serverStatus,
+        submitDisabled:form?.querySelector('button[type="submit"]')?.disabled,
+        oldOptions:[...(form?.elements.old.options||[])].map(option=>option.value),
+        newOptions:[...(form?.elements.new.options||[])].map(option=>option.value)};
+    })()`);
+    assert.equal(correctionFormState.valid, true, `product correction form is invalid: ${JSON.stringify(correctionFormState)}`);
+    assert.equal(correctionFormState.submitDisabled, true, `product correction submit handler rejected or ignored the request: ${JSON.stringify(correctionFormState)}`);
+    let correctionTimer;
+    const correctionTimedOut = new Promise((_, reject) => {
+      correctionTimer = setTimeout(() => reject(new Error('source correction did not reach the real server')), 10000);
+    });
+    const correctionPaused = await Promise.race([pausedCorrectionResponse, correctionTimedOut]);
+    clearTimeout(correctionTimer);
+    if (correctionPaused.responseStatusCode !== 200) {
+      const body = await send('Fetch.getResponseBody', { requestId: correctionPaused.requestId });
+      throw new Error(`source correction POST returned HTTP ${correctionPaused.responseStatusCode}: ${body.base64Encoded
+        ? Buffer.from(body.body, 'base64').toString('utf8') : body.body}`);
+    }
+    await send('Fetch.failRequest', { requestId: correctionPaused.requestId, errorReason: 'ConnectionReset' });
+    let correctionPending;
+    for (let i = 0; i < 300; i++) {
+      correctionPending = await evaluate(`(async()=>({
+        error:document.querySelector('#correction-error')?.textContent||'',
+        entries:await new Promise((resolve,reject)=>{const request=indexedDB.open('dlt-source-write-journal',1);
+          request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+            get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})
+      }))()`);
+      if (correctionPending.entries.some(item => item.operation === 'source_correction' && item.phase === 'submitted')) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    const pendingCorrection = correctionPending.entries.find(item => item.operation === 'source_correction');
+    assert.equal(pendingCorrection?.phase, 'submitted', 'product correction form did not retain the lost-response request');
+    assert.match(correctionPending.error, /fetch|network|连接/i);
+    assert.equal(sourceCorrectionPostResponses, 1);
+
+    const correctionServerPid = serverProcess.pid;
+    await stopServer(serverProcess);
+    await startServer();
+    assert.notEqual(serverProcess.pid, correctionServerPid, 'LocalServer did not restart before correction recovery');
+    await send('Page.reload', { ignoreCache: true });
+    await waitForPage();
+    let recoveredCorrection;
+    for (let i = 0; i < 300; i++) {
+      recoveredCorrection = await evaluate(`(async()=>(
+        {ready:document.body.dataset.serverStatus==='verified',
+         entries:await new Promise((resolve,reject)=>{const request=indexedDB.open('dlt-source-write-journal',1);
+           request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+             get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}}),
+         dismiss:!!document.querySelector('#source-write-journal [data-source-write="dismiss"][data-request="${pendingCorrection.request_key}"]')})
+      )()`);
+      if (recoveredCorrection.ready && recoveredCorrection.dismiss) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    const correctionEntry = recoveredCorrection.entries.find(item => item.request_key === pendingCorrection.request_key);
+    assert.equal(correctionEntry?.phase, 'accepted', 'product recovery UI did not persist the correction receipt');
+    assert.equal(recoveredCorrection.dismiss, true);
+    const correctionState = await evaluate(`fetch('/api/source-write-status?request_key='+encodeURIComponent('${pendingCorrection.request_key}')
+      +'&request_sha256='+encodeURIComponent('${pendingCorrection.request_sha256}'),{credentials:'same-origin'}).then(response=>response.json())`);
+    assert.equal(correctionState.write.status, 'accepted');
+    assert.equal(correctionState.write.operation, 'source_correction');
+    const corrections = await evaluate("fetch('/api/source-corrections',{credentials:'same-origin'}).then(response=>response.json())");
+    const matchingCorrections = corrections.corrections.filter(item => item.seq === correctionState.write.result.correction_id
+      && item.old_review_id === originalReview.review_id && item.new_review_id === replacementReview.review_id);
+    assert.equal(matchingCorrections.length, 1,
+      `server did not retain exactly one correction for the selected sources: ${JSON.stringify({corrections, write:correctionState.write, old:originalReview.review_id, new:replacementReview.review_id})}`);
+    await evaluate(`document.querySelector('#source-write-journal [data-source-write="dismiss"][data-request="${pendingCorrection.request_key}"]').click()`);
+    let finalJournal;
+    for (let i = 0; i < 100; i++) {
+      finalJournal = await evaluate(`new Promise((resolve,reject)=>{const request=indexedDB.open('dlt-source-write-journal',1);
+        request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('writes','readonly'),get=tx.objectStore('writes').getAll();
+          get.onsuccess=()=>{db.close();resolve(get.result)};get.onerror=()=>{db.close();reject(get.error)}}})`);
+      if (!finalJournal.length) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.equal(finalJournal.length, 0, 'correction recovery UI did not clear the verified local request');
   } finally {
     try { socket?.close(); } catch {}
     try { secondSocket?.close(); } catch {}
