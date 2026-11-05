@@ -190,3 +190,69 @@ class FixedEvaluationHttpTests(unittest.TestCase):
             rows = db.execute('SELECT status FROM fixed_evaluations WHERE reservation_id=?',
                               (fenced_reservation,)).fetchall()
         self.assertEqual(rows, [('pending',)])
+
+
+    def test_start_response_loss_is_reconciled_without_duplicate_attempt(self):
+        freeze = {'reservation_id': self.reservation, 'methods': self.methods,
+                  'hypothesis': '启动恢复测试', 'timeout': 30, 'confirmed': True,
+                  'request_key': '11111111-1111-4111-8111-111111111111'}
+        freeze['request_sha256'] = _fixed_evaluation_write_digest('freeze', {
+            k: freeze[k] for k in ('reservation_id', 'methods', 'hypothesis', 'timeout', 'confirmed')})
+        status, _, created = self.request('POST', '/api/fixed-evaluations', freeze, self.write)
+        self.assertEqual((status, created['write']['status']), (200, 'accepted'))
+
+        start = {'reservation_id': self.reservation, 'retry': False,
+                 'request_key': '22222222-2222-4222-8222-222222222222'}
+        start['request_sha256'] = _fixed_evaluation_write_digest('start', {
+            'reservation_id': self.reservation, 'retry': False})
+        committed = threading.Event()
+        release = threading.Event()
+        errors = []
+        original_json = Handler._json
+
+        def drop_start_response(handler, response_status, data, **kwargs):
+            if (handler.path == '/api/fixed-evaluations/start' and response_status == 200
+                    and data.get('write', {}).get('status') == 'accepted'):
+                committed.set()
+                if not release.wait(timeout=15):
+                    raise TimeoutError('test did not release dropped start response')
+                handler.connection.close()
+                return
+            return original_json(handler, response_status, data, **kwargs)
+
+        def submit():
+            try:
+                self.request('POST', '/api/fixed-evaluations/start', start, self.write)
+            except Exception as exc:
+                errors.append(exc)
+
+        with patch.object(Handler, '_json', drop_start_response):
+            worker = threading.Thread(target=submit)
+            worker.start()
+            try:
+                self.assertTrue(committed.wait(timeout=15), 'start did not persist its accepted request')
+                query = urlencode({'request_key': start['request_key'], 'operation': 'start',
+                                   'request_sha256': start['request_sha256']})
+                status, _, result = self.request('GET', '/api/fixed-evaluation-writes?' + query,
+                                                 headers=self.read)
+                self.assertEqual((status, result['write']['status']), (200, 'accepted'))
+            finally:
+                release.set()
+                worker.join(timeout=15)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(errors[0], (http.client.RemoteDisconnected, ConnectionError, OSError))
+
+        until = time.monotonic() + 35
+        while time.monotonic() < until:
+            result = self.server.fixed_evaluations.get(self.reservation)
+            if result['status'] != 'running':
+                break
+            time.sleep(.05)
+        self.assertEqual(result['status'], 'complete', result['error'])
+        replay_status, _, replay = self.request('POST', '/api/fixed-evaluations/start', start, self.write)
+        self.assertEqual((replay_status, replay['write']['status']), (200, 'accepted'))
+        with closing(sqlite3.connect(self.path)) as db:
+            attempts = db.execute('SELECT count(*) FROM fixed_evaluation_attempts WHERE reservation_id=?',
+                                  (self.reservation,)).fetchone()[0]
+        self.assertEqual(attempts, 1)
