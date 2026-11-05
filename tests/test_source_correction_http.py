@@ -25,6 +25,8 @@ class SourceCorrectionHttpTests(unittest.TestCase):
         # exercises route behavior while recovery tests cover ACL enforcement.
         with patch('dlt.recovery._require_private_acl'):
             server = LocalServer(0, self.path)
+        # Ensure all HTTP handlers have released SQLite before the fixture removes its database.
+        server.daemon_threads = False
         self.http_server = server
         server.experiments = self.repo
         server.jobs.recover_interrupted(); server.backtests.recover_interrupted()

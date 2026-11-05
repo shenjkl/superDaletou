@@ -1,9 +1,14 @@
 from copy import deepcopy
 from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
+import http.client
 import hashlib
 import json
 import sqlite3
+import threading
 import unittest
+import uuid
+from unittest.mock import patch
 
 from dlt.candidates import _canonical
 from dlt.prospective_closure_writes import digest as closure_digest
@@ -51,11 +56,107 @@ class SeriesHttpTests(unittest.TestCase):
         self.assertIsNone(payload['report']['mean_difference_fraction'])
         self.assertEqual(request('GET', '/api/experiment-series/report?key=missing', headers=read)[0], 404)
         close_request = {'object_key': series_key, 'reason': 'done'}
-        close_body = {**close_request, 'request_key': 'close-series-1',
-                      'request_sha256': closure_digest('series_close', close_request)}
-        status, _, _ = request('POST', '/api/experiment-series/close', json.dumps(close_body), write)
-        self.assertEqual(status, 200)
+        close_key = 'close-series-lost-response'
+        close_sha = closure_digest('series_close', close_request)
+        close_body = {**close_request, 'request_key': close_key, 'request_sha256': close_sha}
+        from dlt.app import Handler
+        response_ready = threading.Event()
+        release_response = threading.Event()
+        errors = []
+        original_json = Handler._json
+
+        def lose_committed_series_close(handler, response_status, data, **kwargs):
+            if (handler.path == '/api/experiment-series/close' and response_status == 200
+                    and data.get('write', {}).get('status') == 'accepted'):
+                response_ready.set()
+                if not release_response.wait(timeout=10):
+                    raise TimeoutError('series close test did not release the response drop')
+                handler.connection.close()
+                return
+            return original_json(handler, response_status, data, **kwargs)
+
+        def close_and_lose_response():
+            try:
+                request('POST', '/api/experiment-series/close', json.dumps(close_body), write)
+            except Exception as exc:
+                errors.append(exc)
+
+        with patch.object(Handler, '_json', lose_committed_series_close):
+            closer = threading.Thread(target=close_and_lose_response)
+            closer.start()
+            try:
+                self.assertTrue(response_ready.wait(timeout=10), 'series close did not reach its accepted response')
+                status, _, state = request(
+                    'GET', '/api/prospective-closure-writes?request_key='+close_key+
+                    '&operation=series_close&request_sha256='+close_sha, headers=read)
+                self.assertEqual(status, 200, state)
+                self.assertEqual(state['write']['status'], 'accepted')
+                self.assertEqual(state['write']['result']['reason'], 'done')
+                with closing(sqlite3.connect(self.path)) as db:
+                    self.assertEqual(db.execute('SELECT count(*) FROM series_closures WHERE series_key=?',
+                                                 (series_key,)).fetchone()[0], 1)
+            finally:
+                release_response.set()
+                closer.join(timeout=10)
+            self.assertFalse(closer.is_alive())
+        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(errors[0], (http.client.RemoteDisconnected, ConnectionError, OSError))
+        status, _, replay = request('POST', '/api/experiment-series/close', json.dumps(close_body), write)
+        self.assertEqual(status, 200, replay)
+        self.assertEqual(replay['write']['status'], 'accepted')
+        status, _, state = request(
+            'GET', '/api/prospective-closure-writes?request_key='+close_key+
+            '&operation=series_close&request_sha256='+close_sha, headers=read)
+        self.assertEqual((status, state['write']['status']), (200, 'accepted'))
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM series_closures WHERE series_key=?',
+                                        (series_key,)).fetchone()[0], 1)
         self.assertEqual(request('POST', '/api/experiment-series/periods', json.dumps(period), write)[0], 200)
+
+        # Race a second series close against its atomic fence.
+        race_key = str(uuid.uuid4())
+        self.series.create(race_key, deepcopy(self.manifest))
+        race_close_request = {'object_key': race_key, 'reason': 'race'}
+        race_request_key = 'close-series-fence-race'
+        race_sha = closure_digest('series_close', race_close_request)
+        race_body = {**race_close_request, 'request_key': race_request_key, 'request_sha256': race_sha}
+        start = threading.Barrier(3)
+
+        def submit_close():
+            start.wait()
+            return request('POST', '/api/experiment-series/close', json.dumps(race_body), write)
+
+        def submit_fence():
+            start.wait()
+            return request('POST', '/api/prospective-closure-writes/fence', json.dumps({
+                'request_key': race_request_key, 'operation': 'series_close',
+                'request': race_close_request, 'request_sha256': race_sha}), write)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            close_future = pool.submit(submit_close)
+            fence_future = pool.submit(submit_fence)
+            start.wait()
+            close_status, _, close_result = close_future.result(timeout=15)
+            fence_status, _, fence_result = fence_future.result(timeout=15)
+        status, _, final = request(
+            'GET', '/api/prospective-closure-writes?request_key='+race_request_key+
+            '&operation=series_close&request_sha256='+race_sha, headers=read)
+        self.assertEqual(status, 200, final)
+        final_status = final['write']['status']
+        fence_write_status = fence_result['write']['status']
+        with closing(sqlite3.connect(self.path)) as db:
+            close_count = db.execute('SELECT count(*) FROM series_closures WHERE series_key=?',
+                                     (race_key,)).fetchone()[0]
+        if final_status == 'accepted':
+            self.assertEqual(close_status, 200, close_result)
+            self.assertEqual(close_result['write']['status'], 'accepted')
+            self.assertEqual((fence_status, fence_write_status), (200, 'accepted'))
+            self.assertEqual(close_count, 1)
+        else:
+            self.assertEqual(final_status, 'fenced')
+            self.assertEqual(close_status, 409, close_result)
+            self.assertEqual((fence_status, fence_write_status), (409, 'fenced'))
+            self.assertEqual(close_count, 0)
 
     def test_legacy_oversized_seed_is_exactly_readable_over_http(self):
         series_key = series_fixtures.LEGACY_SERIES_KEY
