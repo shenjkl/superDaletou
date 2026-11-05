@@ -1,5 +1,6 @@
 """Request recovery contract for closing fixed prospective experiments."""
 from datetime import datetime, timezone
+from contextlib import closing
 import hashlib
 import json
 import re
@@ -155,7 +156,7 @@ def fence(path, request_key, operation, request, request_sha256, retry_of=None):
     if request_sha256 != sha:
         raise ValueError('实验关闭请求摘要不匹配')
     import sqlite3
-    with sqlite3.connect(path) as db, db:
+    with closing(sqlite3.connect(path)) as db, db:
         db.execute('PRAGMA foreign_keys=ON'); db.execute('BEGIN IMMEDIATE')
         state = _state(db, request_key, operation, request, retry_of)
         if state['status'] != 'unknown':
@@ -178,7 +179,7 @@ def status(path, request_key, operation, request_sha256):
     if operation not in OPERATIONS or not isinstance(request_sha256, str) or not re.fullmatch(r'[0-9a-f]{64}', request_sha256):
         raise ValueError('实验关闭状态查询参数无效')
     import sqlite3
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db:
         db.execute('BEGIN')
         accepted = db.execute('SELECT operation,object_key,request_sha256,request_json,result_json '
                               'FROM prospective_closure_write_requests WHERE request_key=?', (request_key,)).fetchone()

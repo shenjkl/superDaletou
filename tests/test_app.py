@@ -29,6 +29,8 @@ class AppTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name)/'research.sqlite3'
         self.server = LocalServer(0, self.path)
+        # Let server_close join completed HTTP handlers before the temporary DB is removed.
+        self.server.daemon_threads = False
         self.server.jobs.recover_interrupted()
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True); self.thread.start()
         self.addCleanup(self.close_server)
@@ -309,6 +311,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(status, 409)
 
     def test_personally_reviewed_experiment_registration_and_fence_race_over_http(self):
+        from concurrent.futures import ThreadPoolExecutor
         from dlt.app import Handler
         from test_candidates import config, input_rows
         from test_settlement import fixture
@@ -435,11 +438,121 @@ class AppTests(unittest.TestCase):
         self.assertIn('not independently', entry['content']['time_evidence'])
         from dlt.prospective_closure_writes import digest as closure_digest
         close_request = {'object_key': 'http-exp', 'reason': 'test'}
-        self.assertEqual(self.write('/api/experiments/close', {
-            'request_key': str(uuid.uuid4()), **close_request,
-            'request_sha256': closure_digest('experiment_close', close_request)})[0], 200)
+        close_key = 'http-close-lost-response'
+        close_sha = closure_digest('experiment_close', close_request)
+        close_body = {'request_key': close_key, **close_request, 'request_sha256': close_sha}
+        close_response_ready = threading.Event()
+        drop_close_response = threading.Event()
+        close_error = []
+
+        def lose_committed_close_response(handler, response_status, data, **kwargs):
+            if (handler.path == '/api/experiments/close' and response_status == 200
+                    and data.get('write', {}).get('status') == 'accepted'):
+                close_response_ready.set()
+                if not drop_close_response.wait(timeout=10):
+                    raise TimeoutError('close test did not release the response drop')
+                handler.connection.close()
+                return
+            return original_json(handler, response_status, data, **kwargs)
+
+        def close_and_lose_response():
+            try:
+                self.write('/api/experiments/close', close_body)
+            except Exception as exc:
+                close_error.append(exc)
+
+        with patch.object(Handler, '_json', lose_committed_close_response):
+            closer = threading.Thread(target=close_and_lose_response)
+            closer.start()
+            try:
+                self.assertTrue(close_response_ready.wait(timeout=10), 'close did not reach its accepted response')
+                status, _, state = self.request(
+                    'GET', '/api/prospective-closure-writes?request_key='+close_key+
+                    '&operation=experiment_close&request_sha256='+close_sha,
+                    headers={'Cookie': self.cookie})
+                self.assertEqual(status, 200, state)
+                self.assertEqual(json.loads(state)['write']['status'], 'accepted')
+                self.assertEqual(json.loads(state)['write']['result']['reason'], 'test')
+                with closing(sqlite3.connect(self.path)) as db:
+                    self.assertEqual(db.execute('SELECT count(*) FROM experiment_closures WHERE experiment_key=?',
+                                                 ('http-exp',)).fetchone()[0], 1)
+            finally:
+                drop_close_response.set()
+                closer.join(timeout=10)
+            self.assertFalse(closer.is_alive())
+        self.assertEqual(len(close_error), 1)
+        self.assertIsInstance(close_error[0], (http.client.RemoteDisconnected, ConnectionError, OSError))
+        # Same-key replay returns the accepted closure without duplicating the immutable closure row.
+        status, _, replay = self.write('/api/experiments/close', close_body)
+        self.assertEqual(status, 200, replay)
+        self.assertEqual(json.loads(replay)['write']['status'], 'accepted')
+        status, _, state = self.request(
+            'GET', '/api/prospective-closure-writes?request_key='+close_key+
+            '&operation=experiment_close&request_sha256='+close_sha,
+            headers={'Cookie': self.cookie})
+        self.assertEqual((status, json.loads(state)['write']['status']), (200, 'accepted'))
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM experiment_closures WHERE experiment_key=?',
+                                         ('http-exp',)).fetchone()[0], 1)
         _, _, result = self.request('GET', '/api/experiments', headers={'Cookie': self.cookie})
         self.assertEqual(json.loads(result)['experiments'][0]['status'], 'closed')
+
+        # Race a second experiment's close request against its atomic fence.
+        race_protocol = {**protocol, 'hypothesis': 'synthetic close/fence race'}
+        race_experiment_key = 'http-close-race-exp'
+        status, _, prepared = self.write('/api/experiments/prepare', {
+            'request_key': race_experiment_key, 'protocol': race_protocol})
+        self.assertEqual(status, 200, prepared)
+        status, _, created = self.write('/api/experiments', {
+            'request_key': race_experiment_key, 'protocol': race_protocol, 'require_intent': True})
+        self.assertEqual(status, 200, created)
+        race_close_request = {'object_key': race_experiment_key, 'reason': 'race test'}
+        race_close_key = 'http-close-fence-race'
+        race_close_sha = closure_digest('experiment_close', race_close_request)
+        race_close_body = {'request_key': race_close_key, **race_close_request,
+                           'request_sha256': race_close_sha}
+        race_start = threading.Barrier(3)
+
+        def close_race_submit():
+            race_start.wait()
+            return self.write('/api/experiments/close', race_close_body)
+
+        def close_race_fence():
+            race_start.wait()
+            return self.write('/api/prospective-closure-writes/fence', {
+                'request_key': race_close_key, 'operation': 'experiment_close',
+                'request': race_close_request, 'request_sha256': race_close_sha})
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            close_future = pool.submit(close_race_submit)
+            fence_future = pool.submit(close_race_fence)
+            race_start.wait()
+            close_status, _, close_payload = close_future.result(timeout=15)
+            fence_status, _, fence_payload = fence_future.result(timeout=15)
+        status, _, race_state = self.request(
+            'GET', '/api/prospective-closure-writes?request_key='+race_close_key+
+            '&operation=experiment_close&request_sha256='+race_close_sha,
+            headers={'Cookie': self.cookie})
+        self.assertEqual(status, 200, race_state)
+        final_closure_state = json.loads(race_state)['write']['status']
+        with closing(sqlite3.connect(self.path)) as db:
+            closure_count = db.execute('SELECT count(*) FROM experiment_closures WHERE experiment_key=?',
+                                       (race_experiment_key,)).fetchone()[0]
+        fence_write_status = json.loads(fence_payload)['write']['status']
+        if final_closure_state == 'accepted':
+            self.assertEqual(close_status, 200, close_payload)
+            self.assertEqual(json.loads(close_payload)['write']['status'], 'accepted')
+            self.assertEqual((fence_status, fence_write_status), (200, 'accepted'))
+            self.assertEqual(closure_count, 1)
+        else:
+            self.assertEqual(final_closure_state, 'fenced')
+            self.assertEqual(close_status, 409, close_payload)
+            self.assertEqual((fence_status, fence_write_status), (409, 'fenced'))
+            self.assertEqual(closure_count, 0)
+        status, _, result = self.request('GET', '/api/experiments', headers={'Cookie': self.cookie})
+        race_entry = next(item for item in json.loads(result)['experiments']
+                          if item['request_key'] == race_experiment_key)
+        self.assertEqual(race_entry['status'], 'closed' if final_closure_state == 'accepted' else 'locally_attested')
 
         pending = {'request_key': 'http-pending', 'protocol': {**protocol, 'hypothesis': 'pending synthetic test'}}
         status, _, result = self.write('/api/experiments/prepare', pending)
@@ -450,7 +563,6 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.write('/api/experiments', {**pending, 'require_intent': True})[0], 400)
 
         # Exercise the same SQLite commit/fence boundary through concurrent HTTP requests.
-        from concurrent.futures import ThreadPoolExecutor
         racing = {'request_key': 'http-race', 'protocol': {**protocol, 'hypothesis': 'concurrent HTTP test'}}
         status, _, prepared = self.write('/api/experiments/prepare', racing)
         self.assertEqual(status, 200, prepared)
