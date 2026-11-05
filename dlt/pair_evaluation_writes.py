@@ -314,7 +314,7 @@ def status_in_transaction(db, operation, key):
                         or result_value.get('result') != business_result or request_value != expected_request):
                     raise ValueError
             else:
-                row = db.execute('SELECT pair_key,decision_seq,previous_seq,selection_sha256,selection_json '
+                row = db.execute('SELECT pair_key,seq,previous_seq,selection_sha256,selection_json '
                                  'FROM model_selection_decisions WHERE request_key=?', (key,)).fetchone()
                 if not row:
                     raise ValueError

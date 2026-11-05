@@ -1832,11 +1832,17 @@ class Handler(BaseHTTPRequestHandler):
                     pair = PairRepository(self.server.db_path).get(pair_key)
                     scenario = (custom_scenario(pair, body.get('custom_input')) if kind == 'custom_payout_v1'
                                 else historical_scenario(self.server.db_path, snapshot_id, pair, scenario_issue))
+                    dependency = scenario.get('source_dependency', {})
+                    write_request = ({'pair_key': pair_key, 'scenario_kind': 'custom_payout_v1',
+                                     'custom_input': scenario['custom_input'], 'samples': samples, 'seed': seed}
+                                    if scenario.get('kind') == 'custom_payout_v1'
+                                    else {'pair_key': pair_key,
+                                          'scenario_snapshot_id': dependency.get('snapshot_id'),
+                                          'scenario_issue': dependency.get('issue'),
+                                          'samples': samples, 'seed': seed})
                     repo.run(key, pair_key, scenario=scenario, samples=samples, seed=seed,
                              max_samples=20000, max_ticket_draws=1000000,
-                             retry_of=body.get('retry_of'),
-                             write_request={name: value for name, value in body.items()
-                                            if name not in ('request_key', 'retry_of')})
+                             retry_of=body.get('retry_of'), write_request=write_request)
                     return self._json(200, {'request_key': key, 'request': repo.get_request(key),
                                             **_evaluation_wire(repo.inspect(key))})
                 finally:

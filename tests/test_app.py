@@ -13,7 +13,7 @@ import unittest
 import uuid
 from unittest.mock import patch
 
-from dlt.app import LocalServer, SingleInstance
+from dlt.app import Handler, LocalServer, SingleInstance
 from dlt.snapshots import SnapshotStore
 from dlt.pair_repository import PairRepository
 from test_candidates import config
@@ -42,6 +42,56 @@ class AppTests(unittest.TestCase):
 
     def close_server(self):
         self.server.shutdown(); self.server.server_close(); self.server.jobs.stop(); self.server.backtests.stop(); self.thread.join(timeout=3)
+
+    def restart_server(self):
+        old = self.server
+        old.shutdown(); old.server_close(); old.jobs.stop(); old.backtests.stop()
+        self.thread.join(timeout=5)
+        self.assertFalse(self.thread.is_alive())
+        self.server = LocalServer(old.server_port, self.path)
+        self.server.daemon_threads = False
+        self.server.jobs.recover_interrupted()
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        self.port = self.server.server_port
+        status, headers, payload = self.request('GET', '/api/session')
+        self.assertEqual(status, 200, payload)
+        self.cookie = headers['set-cookie'].split(';')[0]
+        self.csrf = json.loads(payload)['csrf']
+
+    def write_then_drop_response(self, path, body, request_key):
+        ready = threading.Event()
+        release = threading.Event()
+        errors = []
+        original_json = Handler._json
+
+        def drop_after_commit(handler, response_status, data, **kwargs):
+            if (handler.path == path and response_status == 200 and isinstance(data, dict)
+                    and data.get('request_key') == request_key):
+                ready.set()
+                if not release.wait(timeout=20):
+                    raise TimeoutError('test did not release committed write response')
+                handler.connection.close()
+                return
+            return original_json(handler, response_status, data, **kwargs)
+
+        def submit():
+            try:
+                self.write(path, body)
+            except Exception as exc:
+                errors.append(exc)
+
+        with patch.object(Handler, '_json', drop_after_commit):
+            worker = threading.Thread(target=submit)
+            worker.start()
+            try:
+                self.assertTrue(ready.wait(timeout=20), f'{path} did not return a committed record')
+            finally:
+                release.set()
+                worker.join(timeout=20)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(errors[0], (http.client.RemoteDisconnected, ConnectionError, OSError))
 
     def request(self, method, path, *, body=None, headers=None):
         conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
@@ -641,6 +691,11 @@ class AppTests(unittest.TestCase):
                         'base_price_fen': 200, 'additional_price_fen': 300, 'additional': False,
                         'window': 60, 'seed': 42, 'max_tickets': 500, 'max_sampling_attempts': 20000,
                         'score_temperature': 1.0}}
+        self.write_then_drop_response('/api/pairs', pair_request, 'model-pair')
+        self.restart_server()
+        status, _, receipt = self.request('GET', '/api/pair-evaluation-writes?operation=pair_create&key=model-pair',
+                                          headers={'Cookie': self.cookie})
+        self.assertEqual((status, json.loads(receipt)['write']['status']), (200, 'accepted'))
         status, _, payload = self.write('/api/pairs', pair_request)
         self.assertEqual(status, 200, payload)
         self.assertEqual(json.loads(payload)['seed_encoding'], 'decimal_string_uint64')
@@ -666,12 +721,60 @@ class AppTests(unittest.TestCase):
             self.assertEqual(self.write('/api/evaluations', evaluation)[0], 409)
         finally:
             self.server.evaluation_lock.release()
+        self.write_then_drop_response('/api/evaluations', evaluation, evaluation['request_key'])
+        with closing(sqlite3.connect(self.path)) as db:
+            accepted_request_raw, accepted_result_raw = db.execute(
+                'SELECT request_json,result_json FROM evaluation_write_requests WHERE request_key=?',
+                (evaluation['request_key'],)).fetchone()
+            business_request_raw, business_result_raw = db.execute(
+                'SELECT request_json,result_json FROM draft_evaluations WHERE request_key=?',
+                (evaluation['request_key'],)).fetchone()
+        accepted_request = json.loads(accepted_request_raw)
+        accepted_result = json.loads(accepted_result_raw)
+        business_request = json.loads(business_request_raw)
+        business_result = json.loads(business_result_raw)
+        self.assertEqual(accepted_request, {'pair_key': evaluation['pair_key'],
+                         'scenario_snapshot_id': evaluation['scenario_snapshot_id'],
+                         'scenario_issue': evaluation.get('scenario_issue', '26123'),
+                         'samples': evaluation['samples'], 'seed': evaluation['seed']}, accepted_request)
+        self.assertEqual(accepted_result.get('request'), business_request, accepted_result)
+        self.assertEqual(accepted_result.get('result'), business_result, accepted_result)
+        status, _, evaluation_receipt = self.request(
+            'GET', '/api/pair-evaluation-writes?operation=evaluation&key='+evaluation['request_key'],
+            headers={'Cookie': self.cookie})
+        receipt_data = json.loads(evaluation_receipt)
+        self.assertEqual(status, 200, receipt_data)
+        self.assertIn('write', receipt_data, receipt_data)
+        self.assertEqual(receipt_data['write']['status'], 'accepted', receipt_data)
         status, _, evaluation_body = self.write('/api/evaluations', evaluation)
         self.assertEqual(status, 200, evaluation_body)
         evaluated = json.loads(evaluation_body)['result']
         self.assertEqual(evaluated['pair_sha256'], pair['pair_sha256'])
         self.assertEqual(evaluated['sampling']['samples'], 1000)
+        with closing(sqlite3.connect(self.path)) as db:
+            evaluation_count = db.execute('SELECT count(*) FROM draft_evaluations WHERE request_key=?',
+                                          (evaluation['request_key'],)).fetchone()[0]
+        self.assertEqual(evaluation_count, 1)
         self.assertIsInstance(evaluated['portfolios']['candidate']['mean_gross_tax_before']['fraction'][0], str)
+        history_before = json.loads(payload)['selection_history']
+        decision = {'request_key': 'selection-decision-one', 'pair_key': 'model-pair',
+                    'selection': pair_request['model_selection'],
+                    'expected_previous_seq': len(history_before)}
+        self.write_then_drop_response('/api/model-selection-decisions', decision, decision['request_key'])
+        status, _, decision_receipt = self.request(
+            'GET', '/api/pair-evaluation-writes?operation=selection_decision&key='+decision['request_key'],
+            headers={'Cookie': self.cookie})
+        decision_receipt_data = json.loads(decision_receipt)
+        self.assertEqual(status, 200, decision_receipt_data)
+        self.assertIn('write', decision_receipt_data, decision_receipt_data)
+        self.assertEqual(decision_receipt_data['write']['status'], 'accepted', decision_receipt_data)
+        status, _, decision_payload = self.write('/api/model-selection-decisions', decision)
+        self.assertEqual((status, json.loads(decision_payload)['decision_seq']),
+                         (200, len(history_before)+1))
+        with closing(sqlite3.connect(self.path)) as db:
+            decision_count = db.execute('SELECT count(*) FROM model_selection_decisions WHERE request_key=?',
+                                        (decision['request_key'],)).fetchone()[0]
+        self.assertEqual(decision_count, 1)
         self.assertEqual(self.write('/api/evaluations', evaluation)[0], 200)
         self.assertEqual(self.write('/api/evaluations', {**evaluation, 'seed': 100})[0], 400)
         _, _, latest = self.request('GET', '/api/evaluations?pair=model-pair', headers={'Cookie': self.cookie})
