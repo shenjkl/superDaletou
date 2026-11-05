@@ -151,6 +151,11 @@ class PaperResults:
     def initialize(self):
         self.experiments.initialize()
         with closing(sqlite3.connect(self.path)) as db, db:
+            trigger = db.execute("SELECT sql FROM sqlite_master WHERE type='trigger' "
+                                 "AND name='paper_write_requests_guard_update'").fetchone()
+            trigger_sql = ' '.join(trigger[0].lower().split()) if trigger else ''
+            if trigger and ('json_extract' not in trigger_sql or 'not ( old.operation' in trigger_sql):
+                db.execute('DROP TRIGGER paper_write_requests_guard_update')
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS paper_resolutions (
                     seq INTEGER PRIMARY KEY AUTOINCREMENT, issue TEXT NOT NULL, selected_snapshot TEXT NOT NULL,
@@ -191,7 +196,19 @@ class PaperResults:
                 CREATE TRIGGER IF NOT EXISTS paper_write_requests_guard_update BEFORE UPDATE ON paper_write_requests
                     WHEN OLD.request_key!=NEW.request_key OR OLD.operation!=NEW.operation OR OLD.object_key!=NEW.object_key
                       OR OLD.request_sha256!=NEW.request_sha256 OR OLD.request_json!=NEW.request_json
-                      OR OLD.created_at!=NEW.created_at OR OLD.result_json IS NOT NULL OR NEW.result_json IS NULL
+                      OR OLD.created_at!=NEW.created_at OR NEW.result_json IS NULL
+                      OR (OLD.result_json IS NOT NULL AND NOT (OLD.operation='draw_resolve'
+                          AND json_type(OLD.result_json, '$.resolution_id')='integer'
+                          AND json_type(NEW.result_json, '$.resolution')='object'
+                          AND json_type(NEW.result_json, '$.recalculations')='object'
+                          AND (SELECT COUNT(*) FROM json_each(NEW.result_json))=2
+                          AND (SELECT COUNT(*) FROM json_each(NEW.result_json, '$.resolution'))=3
+                          AND json_type(NEW.result_json, '$.resolution.resolution_id')='integer'
+                          AND json_type(NEW.result_json, '$.resolution.variants_sha256')='text'
+                          AND json_type(NEW.result_json, '$.resolution.selected_row_sha256')='text'
+                          AND json_extract(NEW.result_json, '$.resolution.resolution_id')=json_extract(OLD.result_json, '$.resolution_id')
+                          AND json_extract(NEW.result_json, '$.resolution.variants_sha256')=json_extract(OLD.result_json, '$.variants_sha256')
+                          AND json_extract(NEW.result_json, '$.resolution.selected_row_sha256')=json_extract(OLD.result_json, '$.selected_row_sha256')))
                     BEGIN SELECT RAISE(ABORT, 'immutable paper write receipt'); END;
                 CREATE TRIGGER IF NOT EXISTS paper_write_requests_no_fenced_insert BEFORE INSERT ON paper_write_requests
                     WHEN EXISTS (SELECT 1 FROM paper_write_fences WHERE request_key=NEW.request_key)
@@ -403,7 +420,7 @@ class PaperResults:
                             or resolution.get('selected_row_sha256') != request['row_sha256']):
                         raise PaperResultError('开奖复核接受结果与请求不一致')
                     persisted = db.execute('SELECT issue,selected_snapshot,selected_row_sha256,variants_sha256,note '
-                                           'FROM paper_resolutions WHERE id=?',
+                                           'FROM paper_resolutions WHERE seq=?',
                                            (resolution['resolution_id'],)).fetchone()
                     if persisted != (request['issue'], request['snapshot_id'], request['row_sha256'],
                                      request['variants_sha256'], request['note']):

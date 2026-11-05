@@ -823,7 +823,19 @@ def _expected_triggers(tables):
             "CREATE TRIGGER paper_write_requests_guard_update BEFORE UPDATE ON paper_write_requests "
             "WHEN OLD.request_key!=NEW.request_key OR OLD.operation!=NEW.operation OR OLD.object_key!=NEW.object_key "
             "OR OLD.request_sha256!=NEW.request_sha256 OR OLD.request_json!=NEW.request_json "
-            "OR OLD.created_at!=NEW.created_at OR OLD.result_json IS NOT NULL OR NEW.result_json IS NULL "
+            "OR OLD.created_at!=NEW.created_at OR NEW.result_json IS NULL "
+            "OR (OLD.result_json IS NOT NULL AND NOT (OLD.operation='draw_resolve' "
+            "AND json_type(OLD.result_json, '$.resolution_id')='integer' "
+            "AND json_type(NEW.result_json, '$.resolution')='object' "
+            "AND json_type(NEW.result_json, '$.recalculations')='object' "
+            "AND (SELECT COUNT(*) FROM json_each(NEW.result_json))=2 "
+            "AND (SELECT COUNT(*) FROM json_each(NEW.result_json, '$.resolution'))=3 "
+            "AND json_type(NEW.result_json, '$.resolution.resolution_id')='integer' "
+            "AND json_type(NEW.result_json, '$.resolution.variants_sha256')='text' "
+            "AND json_type(NEW.result_json, '$.resolution.selected_row_sha256')='text' "
+            "AND json_extract(NEW.result_json, '$.resolution.resolution_id')=json_extract(OLD.result_json, '$.resolution_id') "
+            "AND json_extract(NEW.result_json, '$.resolution.variants_sha256')=json_extract(OLD.result_json, '$.variants_sha256') "
+            "AND json_extract(NEW.result_json, '$.resolution.selected_row_sha256')=json_extract(OLD.result_json, '$.selected_row_sha256'))) "
             "BEGIN SELECT RAISE(ABORT, 'immutable paper write receipt'); END")
     if 'paper_write_fences' in tables:
         expected['paper_write_requests_no_fenced_insert'] = ('paper_write_requests',
